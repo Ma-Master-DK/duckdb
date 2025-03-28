@@ -1,3 +1,7 @@
 CompileFlags:
   CompilationDatabase: build/clangd
-  Add: -Wno-unqualified-std-cast-call
+  Add: 
+  - -Wno-unqualified-std-cast-call
+  - -I/home/keinicke/Documents/Repos/Kandidat/Speciale/duckdb/src/include
+  - -I/home/keinicke/Documents/Repos/Kandidat/Speciale/duckdb/tools/shell/include
+  - -I/home/keinicke/Documents/Repos/Kandidat/Speciale/duckdb/tools/sqlite3_api_wrapper/include

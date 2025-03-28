@@ -20,7 +20,11 @@ set(SQLITE_API_WRAPPER_FILES shell_extension.cpp sqlite3_api_wrapper.cpp
                              ${ALL_OBJECT_FILES})
 
 add_library(sqlite3_api_wrapper_static STATIC ${SQLITE_API_WRAPPER_FILES})
-target_link_libraries(sqlite3_api_wrapper_static duckdb_static)
+target_link_libraries(sqlite3_api_wrapper_static duckdb_static
+                      ${XNVME_LIBRARIES})
+include_directories(${XNVME_INCLUDE_DIRS})
+target_link_directories(sqlite3_api_wrapper_static PRIVATE
+                        ${XNVME_LIBRARY_DIRS})
 if(NOT AMALGAMATION_BUILD)
   target_link_libraries(sqlite3_api_wrapper_static duckdb_utf8proc)
 endif()
@@ -38,8 +42,10 @@ include_directories(test/include)
 add_subdirectory(test)
 
 add_executable(test_sqlite3_api_wrapper ${SQLITE_TEST_FILES})
+target_link_directories(test_sqlite3_api_wrapper PRIVATE ${XNVME_LIBRARY_DIRS})
 if(WIN32 OR ZOS)
   target_link_libraries(test_sqlite3_api_wrapper sqlite3_api_wrapper_static)
 else()
-  target_link_libraries(test_sqlite3_api_wrapper sqlite3_api_wrapper)
+  target_link_libraries(test_sqlite3_api_wrapper sqlite3_api_wrapper
+                        ${XNVME_LIBRARIES})
 endif()

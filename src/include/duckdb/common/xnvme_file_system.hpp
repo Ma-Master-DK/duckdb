@@ -1,0 +1,62 @@
+//===----------------------------------------------------------------------===//
+//                         DuckDB
+//
+// duckdb/common/xnvme_file_system.hpp
+//
+//
+//===----------------------------------------------------------------------===//
+
+#pragma once
+
+#include "duckdb/common/file_system.hpp"
+#include <libxnvme.h>
+
+namespace duckdb {
+
+class XNVMEFileHandle : public FileHandle {
+public:
+	XNVMEFileHandle(FileSystem &file_system, string path, struct xnvme_dev *dev, uint32_t flags);
+	~XNVMEFileHandle() override;
+
+	struct xnvme_dev *dev;
+	uint32_t flags;
+};
+
+class XNVMEFileSystem : public FileSystem {
+public:
+	XNVMEFileSystem();
+	~XNVMEFileSystem() override;
+
+	// FileSystem interface implementation
+	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
+	                                optional_ptr<FileOpener> opener = nullptr) override;
+
+	int64_t Read(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+	int64_t Write(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+	void Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	void Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	int64_t GetFileSize(FileHandle &handle) override;
+	time_t GetLastModifiedTime(FileHandle &handle) override;
+	void Seek(FileHandle &handle, idx_t location) override;
+	idx_t SeekPosition(FileHandle &handle) override;
+	bool FileExists(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+	void Truncate(FileHandle &handle, int64_t new_size) override;
+	void FileSync(FileHandle &handle) override;
+
+	std::string GetName() const override {
+		return "XNVMEFileSystem";
+	}
+
+	// Device capability checking
+	bool CanSeek() override;
+	bool OnDiskFile(FileHandle &handle) override;
+	bool CanHandleFile(const string &path) override;
+
+private:
+	// Helper functions for xNVMe operations
+	bool TryInitializeXNVME();
+	bool IsXNVMEPath(const string &path);
+};
+
+} // namespace duckdb

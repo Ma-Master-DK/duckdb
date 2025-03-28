@@ -2,6 +2,7 @@ include_directories(../third_party/catch)
 include_directories(../third_party/tpce-tool/include)
 include_directories(../third_party/sqlite/include)
 include_directories(include)
+include_directories(${XNVME_INCLUDE_DIRS})
 
 # Allows loading tests from registered extensions
 include_directories("${PROJECT_BINARY_DIR}/codegen/include/")
@@ -34,11 +35,12 @@ endif()
 add_definitions(-DDUCKDB_ROOT_DIRECTORY="${PROJECT_SOURCE_DIR}")
 
 add_executable(unittest unittest.cpp ${ALL_OBJECT_FILES})
+target_link_directories(unittest PRIVATE ${XNVME_LIBRARY_DIRS})
 
 if(NOT WIN32
    AND NOT SUN
    AND NOT ZOS)
-  target_link_libraries(unittest duckdb test_helpers)
+  target_link_libraries(unittest duckdb test_helpers ${XNVME_LIBRARIES})
   if(${BUILD_TPCE})
     target_link_libraries(unittest tpce)
   endif()

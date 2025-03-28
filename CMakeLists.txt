@@ -24,6 +24,11 @@ project(DuckDB)
 
 find_package(Threads REQUIRED)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(XNVME REQUIRED xnvme)
+
+add_compile_definitions(${XNVME_CFLAGS_OTHER})
+
 set(DUCKDB_MODULE_BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
