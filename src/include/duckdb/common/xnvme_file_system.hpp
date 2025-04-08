@@ -52,9 +52,6 @@ public:
 	bool CanHandleFile(const string &path) override;
 
 private:
-	// Helper functions for xNVMe operations
-	bool TryInitializeXNVME();
-	bool IsXNVMEPath(const string &path);
 };
 
 } // namespace duckdb
