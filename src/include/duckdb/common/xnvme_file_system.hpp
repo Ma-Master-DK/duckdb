@@ -15,9 +15,6 @@ namespace duckdb {
 
 class XNVMEFileSystem : public FileSystem {
 public:
-	XNVMEFileSystem();
-	~XNVMEFileSystem() override;
-
 	// FileSystem interface implementation
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
 	                                optional_ptr<FileOpener> opener = nullptr) override;
