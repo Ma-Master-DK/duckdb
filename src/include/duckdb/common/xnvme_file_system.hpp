@@ -13,15 +13,6 @@
 
 namespace duckdb {
 
-class XNVMEFileHandle : public FileHandle {
-public:
-	XNVMEFileHandle(FileSystem &file_system, string path, struct xnvme_dev *dev, uint32_t flags);
-	~XNVMEFileHandle() override;
-
-	struct xnvme_dev *dev;
-	uint32_t flags;
-};
-
 class XNVMEFileSystem : public FileSystem {
 public:
 	XNVMEFileSystem();
