@@ -1,5 +1,6 @@
 #include "duckdb/common/virtual_file_system.hpp"
 #include "duckdb/common/gzip_file_system.hpp"
+#include "duckdb/common/xnvme_file_system.hpp"
 #include "duckdb/common/pipe_file_system.hpp"
 #include "duckdb/common/string_util.hpp"
 
@@ -7,6 +8,7 @@ namespace duckdb {
 
 VirtualFileSystem::VirtualFileSystem() : default_fs(FileSystem::CreateLocal()) {
 	VirtualFileSystem::RegisterSubSystem(FileCompressionType::GZIP, make_uniq<GZipFileSystem>());
+	VirtualFileSystem::RegisterSubSystem(make_uniq<XNVMEFileSystem>());
 }
 
 unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, FileOpenFlags flags,
