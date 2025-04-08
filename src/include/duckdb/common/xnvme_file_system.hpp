@@ -52,6 +52,7 @@ public:
 	bool CanHandleFile(const string &path) override;
 
 private:
+	vector<string> FetchFileWithoutGlob(const string &path, FileOpener *opener, bool absolute_path);
 };
 
 } // namespace duckdb
