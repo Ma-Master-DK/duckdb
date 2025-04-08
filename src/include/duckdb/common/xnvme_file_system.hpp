@@ -23,10 +23,20 @@ public:
 	int64_t Write(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
 	void Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
 	void Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	bool Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_bytes) override;
 	int64_t GetFileSize(FileHandle &handle) override;
 	time_t GetLastModifiedTime(FileHandle &handle) override;
+	FileType GetFileType(FileHandle &handle) override;
 	void Seek(FileHandle &handle, idx_t location) override;
 	idx_t SeekPosition(FileHandle &handle) override;
+	void CreateDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+	void RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
+	               FileOpener *opener = nullptr) override;
+	void MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener = nullptr) override;
+	bool IsPipe(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+	void RemoveFile(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+	vector<string> Glob(const string &path, FileOpener *opener = nullptr) override;
 	bool FileExists(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
 	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
 	void Truncate(FileHandle &handle, int64_t new_size) override;
