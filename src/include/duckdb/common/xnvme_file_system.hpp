@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "duckdb/common/file_open_flags.hpp"
 #include "duckdb/common/file_system.hpp"
 #include <libxnvme.h>
 
@@ -53,6 +54,10 @@ public:
 
 private:
 	vector<string> FetchFileWithoutGlob(const string &path, FileOpener *opener, bool absolute_path);
+	void SubmitRead(string &filepath, struct xnvme_queue *queue, xnvme_cmd_ctx *ctx, void *buffer, int64_t nr_bytes,
+	                idx_t location);
+	void SubmitWrite(string &filepath, struct xnvme_queue *queue, xnvme_cmd_ctx *ctx, void *buffer, int64_t nr_bytes,
+	                 idx_t location);
 };
 
 } // namespace duckdb

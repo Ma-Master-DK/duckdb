@@ -1,4 +1,5 @@
 #include "duckdb/common/xnvme_file_system.hpp"
+#include <iostream>
 #include <libxnvme.h>
 #include <unistd.h>
 #include "duckdb/common/exception.hpp"
@@ -24,19 +25,47 @@ namespace duckdb {
 struct XNVMEFileHandle : public FileHandle {
 public:
 	XNVMEFileHandle(FileSystem &file_system, string path, struct xnvme_dev *dev, FileOpenFlags flags)
-	    : FileHandle(file_system, std::move(path), flags), dev(dev) {};
+	    : FileHandle(file_system, std::move(path), flags), dev(dev) {
+		if (flags.AsyncIO()) {
+			int ret = xnvme_queue_init(dev, qdepth, 0, &queue);
+			if (ret) {
+				throw IOException("Could not initialize NVMe command queue!", {{"errno", std::to_string(errno)}}, path,
+				                  strerror(errno));
+			}
+			xnvme_queue_set_cb(queue, cb_fn, nullptr);
+		}
+	};
 	~XNVMEFileHandle() override {
 		XNVMEFileHandle::Close();
 	};
 
 	struct xnvme_dev *dev;
+	struct xnvme_queue *queue;
+	const int qdepth = 16;
 
 public:
 	void Close() override {
+		if (queue) {
+			xnvme_queue_term(queue);
+			queue = nullptr;
+		}
 		if (dev) {
 			xnvme_dev_close(dev);
 			dev = nullptr;
 		}
+	}
+
+private:
+	static void cb_fn(struct xnvme_cmd_ctx *ctx, void *arg_unused) {
+		if (xnvme_cmd_ctx_cpl_status(ctx)) {
+			xnvme_cli_pinf("Command did not complete successfully");
+			xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
+		} else {
+			xnvme_cli_pinf("Command completed succesfully");
+		}
+
+		// Completed: Put the command-context back in the queue
+		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 	}
 };
 
@@ -125,17 +154,21 @@ unique_ptr<FileHandle> XNVMEFileSystem::OpenFile(const string &path_p, FileOpenF
 
 void XNVMEFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
+	auto queue = handle.Cast<XNVMEFileHandle>().queue;
 	auto read_buffer = char_ptr_cast(buffer);
-	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	xnvme_cmd_ctx ctx;
+	if (queue) {
+		ctx = *xnvme_cmd_ctx_from_queue(queue);
+	} else {
+		ctx = xnvme_cmd_ctx_from_dev(dev);
+	}
 
 	while (nr_bytes > 0) {
-		int err = xnvme_file_pread(&ctx, read_buffer, UnsafeNumericCast<size_t>(nr_bytes),
-		                           UnsafeNumericCast<off_t>(location));
-		int64_t bytes_read = UnsafeNumericCast<int64_t>(ctx.cpl.result);
-		if (err != 0) {
-			throw IOException("Could not read from file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
-			                  strerror(errno));
+		SubmitRead(handle.path, queue, &ctx, read_buffer, nr_bytes, location);
+		if (queue) {
+			xnvme_queue_drain(queue);
 		}
+		int64_t bytes_read = UnsafeNumericCast<int64_t>(ctx.cpl.result);
 		if (bytes_read == 0) {
 			throw IOException(
 			    "Could not read enough bytes from file \"%s\": attempted to read %llu bytes from location %llu",
@@ -149,29 +182,70 @@ void XNVMEFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes, i
 
 int64_t XNVMEFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
-	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-	int err = xnvme_file_pread(&ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), 0);
-	int64_t bytes_read = UnsafeNumericCast<int64_t>(ctx.cpl.result);
-	if (err != 0) {
-		throw IOException("Could not read from file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
-		                  strerror(errno));
+	auto queue = handle.Cast<XNVMEFileHandle>().queue;
+	xnvme_cmd_ctx ctx;
+	if (queue) {
+		ctx = *xnvme_cmd_ctx_from_queue(queue);
+	} else {
+		ctx = xnvme_cmd_ctx_from_dev(dev);
 	}
+	SubmitRead(handle.path, queue, &ctx, buffer, nr_bytes, 0);
+	int64_t bytes_read = UnsafeNumericCast<int64_t>(ctx.cpl.result);
 	return bytes_read;
+}
+
+void XNVMEFileSystem::SubmitRead(string &filepath, struct xnvme_queue *queue, xnvme_cmd_ctx *ctx, void *buffer,
+                                 int64_t nr_bytes, idx_t location) {
+	int err = xnvme_file_pread(ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), UnsafeNumericCast<off_t>(location));
+	while (err != 0) {
+		switch (err) {
+		case 0:
+			xnvme_cli_pinf("Command completed successfully");
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue, 0);
+			err = xnvme_file_pread(ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), 0);
+		default:
+			xnvme_queue_put_cmd_ctx(queue, ctx);
+			throw IOException("Could not read from file \"%s\": %s", {{"errno", std::to_string(errno)}}, filepath,
+			                  strerror(errno));
+		}
+	}
+}
+
+void XNVMEFileSystem::SubmitWrite(string &filepath, struct xnvme_queue *queue, xnvme_cmd_ctx *ctx, void *buffer,
+                                  int64_t nr_bytes, idx_t location) {
+	int err = xnvme_file_pwrite(ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), UnsafeNumericCast<off_t>(location));
+	while (err != 0) {
+		switch (err) {
+		case 0:
+			xnvme_cli_pinf("Command completed successfully");
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue, 0);
+			err = xnvme_file_pwrite(ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), 0);
+		default:
+			xnvme_queue_put_cmd_ctx(queue, ctx);
+			throw IOException("Could not write to file \"%s\": %s", {{"errno", std::to_string(errno)}}, filepath,
+			                  strerror(errno));
+		}
+	}
 }
 
 void XNVMEFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
-	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	auto queue = handle.Cast<XNVMEFileHandle>().queue;
+	xnvme_cmd_ctx ctx;
+	if (queue) {
+		ctx = *xnvme_cmd_ctx_from_queue(queue);
+	} else {
+		ctx = xnvme_cmd_ctx_from_dev(dev);
+	}
 	auto write_buffer = char_ptr_cast(buffer);
 	while (nr_bytes > 0) {
 		auto bytes_to_write = MinValue<idx_t>(idx_t(NumericLimits<int32_t>::Maximum()), idx_t(nr_bytes));
-		int err = xnvme_file_pwrite(&ctx, buffer, UnsafeNumericCast<size_t>(bytes_to_write),
-		                            UnsafeNumericCast<off_t>(location));
+		SubmitWrite(handle.path, queue, &ctx, write_buffer, UnsafeNumericCast<int64_t>(bytes_to_write), location);
 		int64_t bytes_written = UnsafeNumericCast<int64_t>(ctx.cpl.result);
-		if (err != 0) {
-			throw IOException("Could not write file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
-			                  strerror(errno));
-		}
 		write_buffer += bytes_written;
 		nr_bytes -= bytes_written;
 		location += UnsafeNumericCast<idx_t>(bytes_written);
@@ -184,12 +258,8 @@ int64_t XNVMEFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_byte
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
 	while (nr_bytes > 0) {
 		auto bytes_to_write = MinValue<idx_t>(idx_t(NumericLimits<int32_t>::Maximum()), idx_t(nr_bytes));
-		int err = xnvme_file_pwrite(&ctx, buffer, UnsafeNumericCast<size_t>(bytes_to_write), 0);
+		SubmitWrite(handle.path, nullptr, &ctx, buffer, UnsafeNumericCast<int64_t>(bytes_to_write), 0);
 		int64_t current_bytes_written = UnsafeNumericCast<int64_t>(ctx.cpl.result);
-		if (err != 0) {
-			throw IOException("Could not write file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
-			                  strerror(errno));
-		}
 		bytes_written += current_bytes_written;
 		buffer = (void *)(data_ptr_cast(buffer) + current_bytes_written);
 		nr_bytes -= current_bytes_written;
@@ -202,6 +272,7 @@ bool XNVMEFileSystem::Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_
 	int fd = open(path.c_str(), O_RDWR);
 	int res = fallocate(fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, UnsafeNumericCast<int64_t>(offset_bytes),
 	                    UnsafeNumericCast<int64_t>(length_bytes));
+	close(fd);
 	return res == 0;
 };
 
@@ -267,9 +338,17 @@ bool XNVMEFileSystem::DirectoryExists(const string &directory, optional_ptr<File
 
 void XNVMEFileSystem::FileSync(FileHandle &handle) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
+	auto queue = handle.Cast<XNVMEFileHandle>().queue;
 	if (xnvme_file_sync(dev) != 0) {
 		throw IOException("Could not sync file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
 		                  strerror(errno));
+	}
+	if (queue) {
+		int ret = xnvme_queue_drain(queue);
+		if (ret < 0) {
+			throw IOException("Could not drain queue for file \"%s\": %s", {{"errno", std::to_string(errno)}},
+			                  handle.path, strerror(errno));
+		}
 	}
 }
 

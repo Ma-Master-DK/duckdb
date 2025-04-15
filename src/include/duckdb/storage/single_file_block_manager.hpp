@@ -25,6 +25,8 @@ struct MetadataHandle;
 struct StorageManagerOptions {
 	bool read_only = false;
 	bool use_direct_io = false;
+	bool use_xnvme = false;
+	bool use_async_io = false;
 	DebugInitialize debug_initialize = DebugInitialize::NO_INITIALIZE;
 	optional_idx block_alloc_size;
 	optional_idx storage_version;

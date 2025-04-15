@@ -133,6 +133,10 @@ struct DBConfigOptions {
 	idx_t checkpoint_wal_size = 1 << 24;
 	//! Whether or not to use Direct IO, bypassing operating system buffers
 	bool use_direct_io = false;
+	//! Whether or not to use xnvme
+	bool use_xnvme = false;
+	//! Whether or not to use async I/O
+	bool use_async_io = false;
 	//! Whether extensions should be loaded on start-up
 	bool load_extensions = true;
 #ifdef DUCKDB_EXTENSION_AUTOLOAD_DEFAULT

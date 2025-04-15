@@ -28,6 +28,8 @@ public:
 	static constexpr idx_t FILE_FLAGS_PARALLEL_ACCESS = idx_t(1 << 8);
 	static constexpr idx_t FILE_FLAGS_EXCLUSIVE_CREATE = idx_t(1 << 9);
 	static constexpr idx_t FILE_FLAGS_NULL_IF_EXISTS = idx_t(1 << 10);
+	static constexpr idx_t FILE_FLAGS_XNVME = idx_t(1 << 11);
+	static constexpr idx_t FILE_FLAGS_ASYNC_IO = idx_t(1 << 12);
 
 public:
 	FileOpenFlags() = default;
@@ -83,6 +85,12 @@ public:
 	inline bool DirectIO() const {
 		return flags & FILE_FLAGS_DIRECT_IO;
 	}
+	inline bool XNVMe() const {
+		return flags & FILE_FLAGS_XNVME;
+	}
+	inline bool AsyncIO() const {
+		return flags & FILE_FLAGS_ASYNC_IO;
+	}
 	inline bool CreateFileIfNotExists() const {
 		return flags & FILE_FLAGS_FILE_CREATE;
 	}
@@ -125,6 +133,10 @@ public:
 	static constexpr FileOpenFlags FILE_FLAGS_WRITE = FileOpenFlags(FileOpenFlags::FILE_FLAGS_WRITE);
 	//! Use direct IO when reading/writing to the file
 	static constexpr FileOpenFlags FILE_FLAGS_DIRECT_IO = FileOpenFlags(FileOpenFlags::FILE_FLAGS_DIRECT_IO);
+	//! Use xNVMe when reading/writing to the file
+	static constexpr FileOpenFlags FILE_FLAGS_XNVME = FileOpenFlags(FileOpenFlags::FILE_FLAGS_XNVME);
+	//! Use xNVMe with async IO when reading/writing to the file
+	static constexpr FileOpenFlags FILE_FLAGS_ASYNC_IO = FileOpenFlags(FileOpenFlags::FILE_FLAGS_ASYNC_IO);
 	//! Create file if not exists, can only be used together with WRITE
 	static constexpr FileOpenFlags FILE_FLAGS_FILE_CREATE = FileOpenFlags(FileOpenFlags::FILE_FLAGS_FILE_CREATE);
 	//! Always create a new file. If a file exists, the file is truncated. Cannot be used together with CREATE.

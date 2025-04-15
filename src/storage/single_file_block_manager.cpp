@@ -171,6 +171,12 @@ FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {
 	if (options.use_direct_io) {
 		result |= FileFlags::FILE_FLAGS_DIRECT_IO;
 	}
+	if (options.use_xnvme) {
+		result |= FileFlags::FILE_FLAGS_XNVME;
+	}
+	if (options.use_async_io && options.use_xnvme) {
+		result |= FileFlags::FILE_FLAGS_ASYNC_IO;
+	}
 	// database files can be read from in parallel
 	result |= FileFlags::FILE_FLAGS_PARALLEL_ACCESS;
 	return result;

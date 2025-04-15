@@ -8,7 +8,6 @@ namespace duckdb {
 
 VirtualFileSystem::VirtualFileSystem() : default_fs(FileSystem::CreateLocal()) {
 	VirtualFileSystem::RegisterSubSystem(FileCompressionType::GZIP, make_uniq<GZipFileSystem>());
-	VirtualFileSystem::RegisterSubSystem(make_uniq<XNVMEFileSystem>());
 }
 
 unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, FileOpenFlags flags,
@@ -31,6 +30,9 @@ unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, FileOpenF
 	}
 	// open the base file handle in UNCOMPRESSED mode
 	flags.SetCompression(FileCompressionType::UNCOMPRESSED);
+	if (flags.XNVMe()) {
+		RegisterSubSystem(make_uniq<XNVMEFileSystem>());
+	}
 	auto file_handle = FindFileSystem(path).OpenFile(path, flags, opener);
 	if (!file_handle) {
 		return nullptr;

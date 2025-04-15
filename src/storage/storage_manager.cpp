@@ -146,6 +146,8 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	options.use_direct_io = config.options.use_direct_io;
 	options.debug_initialize = config.options.debug_initialize;
 	options.storage_version = storage_options.storage_version;
+	options.use_xnvme = config.options.use_xnvme;
+	options.use_async_io = config.options.use_async_io;
 
 	idx_t row_group_size = DEFAULT_ROW_GROUP_SIZE;
 	if (storage_options.row_group_size.IsValid()) {
