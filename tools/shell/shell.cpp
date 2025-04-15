@@ -893,6 +893,8 @@ static char quoteChar(const char *zName) {
 #define SHELL_OPEN_READONLY    4 /* Open a normal database read-only */
 #define SHELL_OPEN_DESERIALIZE 5 /* Open using sqlite3_deserialize() */
 #define SHELL_OPEN_HEXDB       6 /* Use "dbtotxt" output as data source */
+#define SHELL_OPEN_XNVME_SYNC  7 /* Use xnvme in sync mode */
+#define SHELL_OPEN_XNVME_ASYNC 8 /* Use xnvme in sync mode */
 
 static const char *modeDescr[] = {"line",     "column", "list",    "semi",  "html",        "insert",    "quote",
                                   "tcl",      "csv",    "explain", "ascii", "prettyprint", "eqp",       "json",
@@ -2399,6 +2401,14 @@ void ShellState::OpenDB(int flags) {
 		case SHELL_OPEN_READONLY: {
 			sqlite3_open_v2(zDbFilename.c_str(), &db, SQLITE_OPEN_READONLY | openFlags, 0);
 			break;
+		}
+		case SHELL_OPEN_XNVME_SYNC: {
+			sqlite3_open_v2(zDbFilename.c_str(), &db,
+			                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_XNVME_SYNC | openFlags, 0);
+		}
+		case SHELL_OPEN_XNVME_ASYNC: {
+			sqlite3_open_v2(zDbFilename.c_str(), &db,
+			                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_XNVME_ASYNC | openFlags, 0);
 		}
 		case SHELL_OPEN_UNSPEC:
 		case SHELL_OPEN_NORMAL: {
@@ -4900,6 +4910,10 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 			data.openMode = SHELL_OPEN_READONLY;
 		} else if (strcmp(z, "-unredacted") == 0) {
 			data.openFlags |= DUCKDB_UNREDACTED_SECRETS;
+		} else if (strcmp(z, "-xsync") == 0) {
+			data.openMode |= SHELL_OPEN_XNVME_SYNC;
+		} else if (strcmp(z, "-xasync") == 0) {
+			data.openMode = SHELL_OPEN_XNVME_ASYNC;
 		} else if (strcmp(z, "-unsigned") == 0) {
 			data.openFlags |= DUCKDB_UNSIGNED_EXTENSIONS;
 		} else if (strcmp(z, "-safe") == 0) {
@@ -4991,6 +5005,10 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 			data.colSeparator = ",";
 		} else if (strcmp(z, "-readonly") == 0) {
 			data.openMode = SHELL_OPEN_READONLY;
+		} else if (strcmp(z, "-xsync") == 0) {
+			data.openMode = SHELL_OPEN_XNVME_SYNC;
+		} else if (strcmp(z, "-xasync") == 0) {
+			data.openMode = SHELL_OPEN_XNVME_ASYNC;
 		} else if (strcmp(z, "-ascii") == 0) {
 			data.mode = RenderMode::ASCII;
 			data.colSeparator = SEP_Unit;

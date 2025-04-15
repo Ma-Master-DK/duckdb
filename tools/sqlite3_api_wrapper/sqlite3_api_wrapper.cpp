@@ -119,6 +119,13 @@ int sqlite3_open_v2(const char *filename, /* Database filename (UTF-8) */
 		if (flags & DUCKDB_UNREDACTED_SECRETS) {
 			config.options.allow_unredacted_secrets = true;
 		}
+		if (flags & SQLITE_OPEN_XNVME_SYNC) {
+			config.options.use_xnvme = true;
+		}
+		if (flags & SQLITE_OPEN_XNVME_ASYNC) {
+			config.options.use_xnvme = true;
+			config.options.use_async_io = true;
+		}
 
 		config.error_manager->AddCustomError(
 		    ErrorType::UNSIGNED_EXTENSION,
