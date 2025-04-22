@@ -2405,6 +2405,7 @@ void ShellState::OpenDB(int flags) {
 		case SHELL_OPEN_XNVME_SYNC: {
 			sqlite3_open_v2(zDbFilename.c_str(), &db,
 			                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_XNVME_SYNC | openFlags, 0);
+			break;
 		}
 		case SHELL_OPEN_XNVME_ASYNC: {
 			sqlite3_open_v2(zDbFilename.c_str(), &db,
@@ -3654,6 +3655,10 @@ bool ShellState::OpenDatabase(const char **azArg, idx_t nArg) {
 			openMode = SHELL_OPEN_READONLY;
 		} else if (optionMatch(z, "nofollow")) {
 			openFlags |= SQLITE_OPEN_NOFOLLOW;
+		} else if (optionMatch(z, "xsync")) {
+			openMode |= SHELL_OPEN_XNVME_SYNC;
+		} else if (optionMatch(z, "xasync")) {
+			openMode |= SHELL_OPEN_XNVME_ASYNC;
 		} else if (z[0] == '-') {
 			utf8_printf(stderr, "unknown option: %s\n", z);
 			return false;
@@ -4703,6 +4708,8 @@ static const char zOptions[] = "   -ascii               set output mode to 'asci
                                "   -nullvalue TEXT      set text string for NULL values. Default ''\n"
                                "   -quote               set output mode to 'quote'\n"
                                "   -readonly            open the database read-only\n"
+                               "   -xsync               Use xnvme in synchronous mode to read and write to files\n"
+                               "   -xasync              Use xnvme in asynchronous mode to read and write to files\n"
                                "   -s COMMAND           run \"COMMAND\" and exit\n"
                                "   -safe                enable safe-mode\n"
                                "   -separator SEP       set output column separator. Default: '|'\n"
@@ -4799,6 +4806,7 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 
 	setBinaryMode(stdin, 0);
 	setvbuf(stderr, 0, _IONBF, 0); /* Make sure stderr is unbuffered */
+	setvbuf(stdout, nullptr, _IONBF, 0);
 	stdin_is_interactive = isatty(0);
 	stdout_is_console = isatty(1);
 	stderr_is_console = isatty(2);
@@ -4913,7 +4921,7 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 		} else if (strcmp(z, "-xsync") == 0) {
 			data.openMode |= SHELL_OPEN_XNVME_SYNC;
 		} else if (strcmp(z, "-xasync") == 0) {
-			data.openMode = SHELL_OPEN_XNVME_ASYNC;
+			data.openMode |= SHELL_OPEN_XNVME_ASYNC;
 		} else if (strcmp(z, "-unsigned") == 0) {
 			data.openFlags |= DUCKDB_UNSIGNED_EXTENSIONS;
 		} else if (strcmp(z, "-safe") == 0) {

@@ -33,15 +33,21 @@ public:
 				                  strerror(errno));
 			}
 			xnvme_queue_set_cb(queue, cb_fn, nullptr);
+		} else {
+			queue = nullptr;
 		}
+	};
+	void IncreaseOffset(int64_t bytes_written) {
+		offset_from_writes += bytes_written;
 	};
 	~XNVMEFileHandle() override {
 		XNVMEFileHandle::Close();
 	};
 
-	struct xnvme_dev *dev;
-	struct xnvme_queue *queue;
+	struct xnvme_dev *dev = nullptr;
+	struct xnvme_queue *queue = nullptr;
 	const int qdepth = 16;
+	off_t offset_from_writes = 0;
 
 public:
 	void Close() override {
@@ -111,7 +117,7 @@ unique_ptr<FileHandle> XNVMEFileSystem::OpenFile(const string &path_p, FileOpenF
 
 	bool open_read = flags.OpenForReading();
 	bool open_write = flags.OpenForWriting();
-	xnvme_opts opts = xnvme_opts_default();
+	struct xnvme_opts opts = xnvme_opts_default();
 	opts.rdwr = 0;
 	if (open_read && open_write) {
 		opts.rdwr = 1;
@@ -134,6 +140,13 @@ unique_ptr<FileHandle> XNVMEFileSystem::OpenFile(const string &path_p, FileOpenF
 	}
 	if (flags.DirectIO()) {
 		opts.direct = 1;
+	}
+
+	// Determine permissions
+	if (flags.CreatePrivateFile()) {
+		opts.create_mode = 0600; // Only the user can read and write
+	} else {
+		opts.create_mode = 0666; // Everyone can read and write
 	}
 
 	// Open the file
@@ -206,7 +219,9 @@ void XNVMEFileSystem::SubmitRead(string &filepath, struct xnvme_queue *queue, xn
 			xnvme_queue_poke(queue, 0);
 			err = xnvme_file_pread(ctx, buffer, UnsafeNumericCast<size_t>(nr_bytes), 0);
 		default:
-			xnvme_queue_put_cmd_ctx(queue, ctx);
+			if (queue) {
+				xnvme_queue_put_cmd_ctx(queue, ctx);
+			}
 			throw IOException("Could not read from file \"%s\": %s", {{"errno", std::to_string(errno)}}, filepath,
 			                  strerror(errno));
 		}
@@ -254,15 +269,25 @@ void XNVMEFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes, 
 
 int64_t XNVMEFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
+	auto queue = handle.Cast<XNVMEFileHandle>().queue;
+	xnvme_cmd_ctx ctx;
 	int64_t bytes_written = 0;
-	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	auto location = handle.Cast<XNVMEFileHandle>().offset_from_writes;
+	if (queue) {
+		ctx = *xnvme_cmd_ctx_from_queue(queue);
+	} else {
+		ctx = xnvme_cmd_ctx_from_dev(dev);
+	}
+	auto write_buffer = char_ptr_cast(buffer);
 	while (nr_bytes > 0) {
 		auto bytes_to_write = MinValue<idx_t>(idx_t(NumericLimits<int32_t>::Maximum()), idx_t(nr_bytes));
-		SubmitWrite(handle.path, nullptr, &ctx, buffer, UnsafeNumericCast<int64_t>(bytes_to_write), 0);
+		SubmitWrite(handle.path, queue, &ctx, write_buffer, UnsafeNumericCast<int64_t>(bytes_to_write), location);
 		int64_t current_bytes_written = UnsafeNumericCast<int64_t>(ctx.cpl.result);
 		bytes_written += current_bytes_written;
-		buffer = (void *)(data_ptr_cast(buffer) + current_bytes_written);
+		write_buffer += current_bytes_written;
 		nr_bytes -= current_bytes_written;
+		handle.Cast<XNVMEFileHandle>().IncreaseOffset(current_bytes_written);
+		location += current_bytes_written;
 	}
 	return bytes_written;
 }
@@ -339,16 +364,16 @@ bool XNVMEFileSystem::DirectoryExists(const string &directory, optional_ptr<File
 void XNVMEFileSystem::FileSync(FileHandle &handle) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
 	auto queue = handle.Cast<XNVMEFileHandle>().queue;
-	if (xnvme_file_sync(dev) != 0) {
-		throw IOException("Could not sync file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
-		                  strerror(errno));
-	}
 	if (queue) {
 		int ret = xnvme_queue_drain(queue);
 		if (ret < 0) {
 			throw IOException("Could not drain queue for file \"%s\": %s", {{"errno", std::to_string(errno)}},
 			                  handle.path, strerror(errno));
 		}
+	}
+	if (xnvme_file_sync(dev) != 0) {
+		throw IOException("Could not sync file \"%s\": %s", {{"errno", std::to_string(errno)}}, handle.path,
+		                  strerror(errno));
 	}
 }
 
