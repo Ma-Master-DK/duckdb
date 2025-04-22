@@ -31,7 +31,7 @@ unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, FileOpenF
 	// open the base file handle in UNCOMPRESSED mode
 	flags.SetCompression(FileCompressionType::UNCOMPRESSED);
 	if (flags.XNVMe()) {
-		RegisterSubSystem(make_uniq<XNVMEFileSystem>());
+		RegisterSubSystem(FileSystem::CreateXNVME());
 	}
 	auto file_handle = FindFileSystem(path).OpenFile(path, flags, opener);
 	if (!file_handle) {

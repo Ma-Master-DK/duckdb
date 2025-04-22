@@ -38,8 +38,11 @@ public:
 		}
 	};
 	void IncreaseOffset(int64_t bytes_written) {
-		offset_from_writes += bytes_written;
+		offset += bytes_written;
 	};
+	void SetOffset(int64_t offset) {
+		offset = offset;
+	}
 	~XNVMEFileHandle() override {
 		XNVMEFileHandle::Close();
 	};
@@ -47,7 +50,7 @@ public:
 	struct xnvme_dev *dev = nullptr;
 	struct xnvme_queue *queue = nullptr;
 	const int qdepth = 16;
-	off_t offset_from_writes = 0;
+	off_t offset = 0;
 
 public:
 	void Close() override {
@@ -272,7 +275,7 @@ int64_t XNVMEFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_byte
 	auto queue = handle.Cast<XNVMEFileHandle>().queue;
 	xnvme_cmd_ctx ctx;
 	int64_t bytes_written = 0;
-	auto location = handle.Cast<XNVMEFileHandle>().offset_from_writes;
+	auto location = handle.Cast<XNVMEFileHandle>().offset;
 	if (queue) {
 		ctx = *xnvme_cmd_ctx_from_queue(queue);
 	} else {
@@ -303,6 +306,7 @@ bool XNVMEFileSystem::Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_
 
 int64_t XNVMEFileSystem::GetFileSize(FileHandle &handle) {
 	auto dev = handle.Cast<XNVMEFileHandle>().dev;
+	xnvme_dev_derive_geo(dev);
 	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
 	return UnsafeNumericCast<int64_t>(geo->tbytes);
 }
@@ -327,7 +331,7 @@ void XNVMEFileSystem::Truncate(FileHandle &handle, int64_t new_size) {
 }
 
 bool XNVMEFileSystem::CanSeek() {
-	return false;
+	return true;
 }
 
 bool XNVMEFileSystem::OnDiskFile(FileHandle &handle) {
@@ -338,6 +342,7 @@ void XNVMEFileSystem::Seek(FileHandle &handle, idx_t location) {
 	if (!CanSeek()) {
 		throw IOException("Cannot seek in files of this type");
 	}
+	handle.Cast<XNVMEFileHandle>().SetOffset(UnsafeNumericCast<int64_t>(location));
 }
 
 idx_t XNVMEFileSystem::SeekPosition(FileHandle &handle) {
