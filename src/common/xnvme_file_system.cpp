@@ -523,7 +523,7 @@ void XNVMEFileSystem::MoveFile(const string &source, const string &target, optio
 
 bool XNVMEFileSystem::CanHandleFile(const string &path) {
 	size_t res = path.find("/mnt/");
-	if (res == 0) {
+	if (path.find("/mnt/nvme") == 0) {
 		return true;
 	}
 	return false;
