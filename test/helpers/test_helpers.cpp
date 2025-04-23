@@ -38,7 +38,7 @@ bool NO_FAIL(duckdb::unique_ptr<QueryResult> result) {
 }
 
 void TestDeleteDirectory(string path) {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	try {
 		if (fs->DirectoryExists(path)) {
 			fs->RemoveDirectory(path);
@@ -48,7 +48,7 @@ void TestDeleteDirectory(string path) {
 }
 
 void TestDeleteFile(string path) {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	try {
 		if (fs->FileExists(path)) {
 			fs->RemoveFile(path);
@@ -75,7 +75,7 @@ void DeleteDatabase(string path) {
 }
 
 void TestCreateDirectory(string path) {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	fs->CreateDirectory(path);
 }
 
@@ -107,7 +107,7 @@ string GetTestDirectory() {
 }
 
 string TestDirectoryPath() {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	auto test_directory = GetTestDirectory();
 	if (!fs->DirectoryExists(test_directory)) {
 		fs->CreateDirectory(test_directory);
@@ -127,7 +127,7 @@ string TestDirectoryPath() {
 }
 
 string TestCreatePath(string suffix) {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	return fs->JoinPath(TestDirectoryPath(), suffix);
 }
 
@@ -174,7 +174,7 @@ unique_ptr<DBConfig> GetTestConfig() {
 }
 
 string GetCSVPath() {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	string csv_path = TestCreatePath("csv_files");
 	if (fs->DirectoryExists(csv_path)) {
 		fs->RemoveDirectory(csv_path);

@@ -33,7 +33,7 @@ static void create_dummy_file(string fname) {
 }
 
 TEST_CASE("Make sure the file:// protocol works as expected", "[file_system]") {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	auto dname = fs->JoinPath(fs->GetWorkingDirectory(), TestCreatePath("TEST_DIR"));
 	auto dname_converted_slashes = StringUtil::Replace(dname, "\\", "/");
 
@@ -97,7 +97,7 @@ TEST_CASE("Make sure the file:// protocol works as expected", "[file_system]") {
 }
 
 TEST_CASE("Make sure file system operators work as advertised", "[file_system]") {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	auto dname = TestCreatePath("TEST_DIR");
 	string fname = "TEST_FILE";
 	string fname2 = "TEST_FILE_TWO";
@@ -146,7 +146,7 @@ TEST_CASE("Make sure file system operators work as advertised", "[file_system]")
 #define INTEGER_COUNT 512
 
 TEST_CASE("Test file operations", "[file_system]") {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	duckdb::unique_ptr<FileHandle> handle, handle2;
 	int64_t test_data[INTEGER_COUNT];
 	for (int i = 0; i < INTEGER_COUNT; i++) {

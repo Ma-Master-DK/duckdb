@@ -27,7 +27,7 @@ bool TestMemoryLeaks() {
 } // namespace duckdb
 
 int main(int argc, char *argv[]) {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	string test_directory = DUCKDB_ROOT_DIRECTORY;
 	bool delete_test_path = true;
 

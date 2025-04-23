@@ -16,7 +16,7 @@ using namespace duckdb;
 using namespace std;
 
 TEST_CASE("Test transactional integrity when facing process aborts", "[persistence][.]") {
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 
 	// shared memory to keep track of insertions
 	size_t *count = (size_t *)mmap(NULL, sizeof(size_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);

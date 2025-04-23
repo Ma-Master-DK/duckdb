@@ -182,7 +182,7 @@ void RegisterSqllogictests() {
 	    "test/index/view/10/slt_good_2.test",
 	    // strange error in hash comparison, results appear correct...
 	    "test/index/random/10/slt_good_7.test", "test/index/random/10/slt_good_9.test"};
-	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateLocal();
+	duckdb::unique_ptr<FileSystem> fs = FileSystem::CreateXNVME();
 	listFiles(*fs, fs->JoinPath(fs->JoinPath("third_party", "sqllogictest"), "test"), [&](const string &path) {
 		if (endsWith(path, ".test")) {
 			for (auto &excl : excludes) {
