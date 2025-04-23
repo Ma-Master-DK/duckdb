@@ -5,3 +5,5 @@ CompileFlags:
   - -I/home/keinicke/duckdb/src/include
   - -I/home/keinicke/duckdb/tools/shell/include
   - -I/home/keinicke/duckdb/tools/sqlite3_api_wrapper/include
+  - -I/home/keinicke/duckdb/third_party/catch
+  - -I/home/keinicke/duckdb/test/include
