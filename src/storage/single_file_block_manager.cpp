@@ -200,7 +200,7 @@ void SingleFileBlockManager::CreateNewDatabase() {
 
 	// open the RDBMS handle
 	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
+	handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -246,7 +246,7 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
 
 	// ensure that writing to disk is completed before returning
-	handle->Sync();
+	handle->Sync(); // TODOTODO: sync device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
 	// we start with h2 as active_header, this way our initial write will be in h1
 	iteration_count = 0;
 	active_header = 1;
@@ -258,7 +258,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 	// open the RDBMS handle
 	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
+	handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
 	if (!handle) {
 		// this can only happen in read-only mode - as that is when we set FILE_FLAGS_NULL_IF_NOT_EXISTS
 		throw IOException("Cannot open database \"%s\" in read-only mode: database does not exist", path);
@@ -314,7 +314,7 @@ void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t locati
 	uint64_t checksum = Checksum(block.buffer, block.Size());
 	Store<uint64_t>(checksum, block.InternalBuffer());
 	// now write the buffer
-	block.Write(*handle, location);
+	block.Write(*handle, location); // TODOTODO: write to device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {
