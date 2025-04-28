@@ -12,6 +12,8 @@
 #include "duckdb/storage/metadata/metadata_writer.hpp"
 #include "duckdb/storage/storage_manager.hpp"
 
+#include <libxnvme.h>
+
 #include <algorithm>
 #include <cstring>
 
@@ -201,6 +203,26 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	// open the RDBMS handle
 	auto &fs = FileSystem::Get(db);
 	handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
+
+	// we open the device with xnvme
+	// assuming only the db will on the device
+	const char *env_device_path = std::getenv("XNVME_DEV_USE");
+	if (!env_device_path) {
+		throw IOException("Environment variable 'XNVME_DEV_USE' is not set.");
+	}
+	xnvme_opts opts = xnvme_opts_default();
+
+	// to work: chmod 666 /dev/nvme1n1
+	// after: chmod 660 /dev/nvme1n1
+	xnvme_dev *dev = xnvme_dev_open(env_device_path, &opts);
+	if (!dev) {
+		int errnum = errno;  // capture errno immediately
+		throw IOException(
+			"Cannot open database \"%s\" in read-only mode: %s (errno=%d)", 
+			env_device_path, std::strerror(errnum), errnum
+		);
+	}
+	xnvme_dev_close(dev);
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header

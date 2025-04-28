@@ -300,9 +300,10 @@ void DatabaseInstance::Initialize(const char *database_path, DBConfig *user_conf
 	// initialize the secret manager
 	config.secret_manager->Initialize(*this);
 
+	// TODOTODO: db type not from path
 	// resolve the type of teh database we are opening
-	auto &fs = FileSystem::GetFileSystem(*this);
-	DBPathAndType::ResolveDatabaseType(fs, config.options.database_path, config.options.database_type);
+	// auto &fs = FileSystem::GetFileSystem(*this);
+	// DBPathAndType::ResolveDatabaseType(fs, config.options.database_path, config.options.database_type);
 
 	// initialize the system catalog
 	db_manager->InitializeSystemCatalog();

@@ -320,13 +320,15 @@ string FileSystem::ExtractName(const string &path) {
 	return splits.back();
 }
 
-string FileSystem::ExtractBaseName(const string &path) {
-	if (path.empty()) {
-		return string();
-	}
-	auto vec = StringUtil::Split(ExtractName(path), ".");
-	D_ASSERT(!vec.empty());
-	return vec[0];
+string FileSystem::ExtractBaseName(const string &path) { // TODOTODO: db name not from path
+	return "test";
+
+	// if (path.empty()) {
+	// 	return string();
+	// }
+	// auto vec = StringUtil::Split(ExtractName(path), ".");
+	// D_ASSERT(!vec.empty());
+	// return vec[0];
 }
 
 string FileSystem::GetHomeDirectory(optional_ptr<FileOpener> opener) {

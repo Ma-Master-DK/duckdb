@@ -162,12 +162,14 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	}
 	// Check if the database file already exists.
 	// Note: a file can also exist if there was a ROLLBACK on a previous transaction creating that file.
-	if (!read_only && !fs.FileExists(path)) {
+	// if (!read_only && !fs.FileExists(path)) { // TODOTODO: dev path should be valid
+	if (true) {
 		// file does not exist and we are in read-write mode
 		// create a new file
 
 		// check if a WAL file already exists
-		auto wal_path = GetWALPath();
+		// auto wal_path = GetWALPath(); // TODOTODO: WAL path should be on separate device or partition from db path
+		auto wal_path = "~/thesis/test/test.db.wal";
 		if (fs.FileExists(wal_path)) {
 			// WAL file exists but database file does not
 			// remove the WAL

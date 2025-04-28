@@ -4389,7 +4389,7 @@ int ShellState::RunOneSqlLine(char *zSql) {
 	int rc;
 	char *zErrMsg = nullptr;
 
-	OpenDB(0);
+	OpenDB(0); // TODOTODO: db created/opened
 	if (ShellHasFlag(SHFLG_Backslash)) {
 		resolve_backslashes(zSql);
 	}
@@ -4399,7 +4399,7 @@ int ShellState::RunOneSqlLine(char *zSql) {
 	}
 #endif
 	BEGIN_TIMER;
-	rc = ExecuteSQL(zSql, &zErrMsg);
+	rc = ExecuteSQL(zSql, &zErrMsg); // TODOTODO: db used
 	END_TIMER;
 	if (rc || zErrMsg) {
 		if (zErrMsg != 0) {

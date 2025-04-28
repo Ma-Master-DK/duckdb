@@ -7,11 +7,20 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/duckdb",
-            //"args": ["-f", "~/thesis/test/write.s", "~/thesis/test/test.ddb"],
+            // "args": ["-f", "~/thesis/test/write.s", "~/thesis/test/test.ddb"],
             "args": ["-f", "~/thesis/test/write.s", "$XNVME_DEV_USE"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "ASAN_OPTIONS",
+                    "value": "detect_leaks=0"
+                },
+                {
+                    "name": "XNVME_DEV_USE",
+                    "value": "/dev/nvme1n1"
+                },
+            ],
             "externalConsole": false,
             "MIMode": "gdb", // Use "lldb" if on macOS
             "setupCommands": [
