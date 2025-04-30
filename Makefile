@@ -268,6 +268,9 @@ endif
 ifeq (${NATIVE_ARCH}, 1)
 	CMAKE_VARS:=${CMAKE_VARS} -DNATIVE_ARCH=1
 endif
+ifeq (${TEST_USE_XNVME}, 1)
+	CMAKE_VARS:=${CMAKE_VARS} -DTEST_USE_XNVME=1
+endif
 
 
 # Optional overrides
