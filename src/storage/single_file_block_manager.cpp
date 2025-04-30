@@ -198,31 +198,53 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 }
 
 void SingleFileBlockManager::CreateNewDatabase() {
-	auto flags = GetFileFlags(true);
+	// auto flags = GetFileFlags(true);
 
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
+	// // open the RDBMS handle
+	// auto &fs = FileSystem::Get(db);
+	// handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here,
+	// https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
 
 	// we open the device with xnvme
 	// assuming only the db will on the device
+
 	const char *env_device_path = std::getenv("XNVME_DEV_USE");
 	if (!env_device_path) {
 		throw IOException("Environment variable 'XNVME_DEV_USE' is not set.");
 	}
-	xnvme_opts opts = xnvme_opts_default();
+
+	// ----- GUIDE START -----
+
+	struct xnvme_opts opts = xnvme_opts_default();
+	struct xnvme_dev *dev;
+	const struct xnvme_geo *geo;
+	uint32_t nsid = NULL;
+
+	size_t buf_nbytes;
+	char *buf = nullptr;
 
 	// to work: chmod 666 /dev/nvme1n1
 	// after: chmod 660 /dev/nvme1n1
-	xnvme_dev *dev = xnvme_dev_open(env_device_path, &opts);
+	dev = xnvme_dev_open(env_device_path, &opts);
 	if (!dev) {
-		int errnum = errno;  // capture errno immediately
-		throw IOException(
-			"Cannot open database \"%s\" in read-only mode: %s (errno=%d)", 
-			env_device_path, std::strerror(errnum), errnum
-		);
+		int errnum = errno; // capture errno immediately
+		throw IOException("Cannot open database \"%s\" in read-only mode: %s (errno=%d)", env_device_path,
+		                  std::strerror(errnum), errnum);
 	}
+
+	nsid = xnvme_dev_get_nsid(dev);
+	geo = xnvme_dev_get_geo(dev);
+
+	buf_nbytes = geo->lba_nbytes;
+	buf = static_cast<char *>(xnvme_buf_alloc(dev, buf_nbytes));
+	memset(buf, 0, buf_nbytes);
+
+	// WRITE HERE
+
+	xnvme_buf_free(dev, buf);
 	xnvme_dev_close(dev);
+
+	// ----- GUIDE DONE -----
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -268,7 +290,8 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
 
 	// ensure that writing to disk is completed before returning
-	handle->Sync(); // TODOTODO: sync device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
+	handle
+	    ->Sync(); // TODOTODO: sync device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
 	// we start with h2 as active_header, this way our initial write will be in h1
 	iteration_count = 0;
 	active_header = 1;
@@ -280,7 +303,9 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 	// open the RDBMS handle
 	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
+	handle = fs.OpenFile(
+	    path,
+	    flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
 	if (!handle) {
 		// this can only happen in read-only mode - as that is when we set FILE_FLAGS_NULL_IF_NOT_EXISTS
 		throw IOException("Cannot open database \"%s\" in read-only mode: database does not exist", path);
@@ -336,7 +361,8 @@ void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t locati
 	uint64_t checksum = Checksum(block.buffer, block.Size());
 	Store<uint64_t>(checksum, block.InternalBuffer());
 	// now write the buffer
-	block.Write(*handle, location); // TODOTODO: write to device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
+	block.Write(*handle, location); // TODOTODO: write to device with xnvme here,
+	                                // https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {

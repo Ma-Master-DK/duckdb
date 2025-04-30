@@ -7,8 +7,8 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/duckdb",
-            // "args": ["-f", "~/thesis/test/write.s", "~/thesis/test/test.ddb"],
-            "args": ["-f", "~/thesis/test/write.s", "$XNVME_DEV_USE"],
+            "args": ["-f", "~/thesis/test/write.s", "~/thesis/test/test.ddb"],
+            //"args": ["-f", "~/thesis/test/write.s", "$XNVME_DEV_USE"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -22,7 +22,7 @@
                 },
             ],
             "externalConsole": false,
-            "MIMode": "gdb", // Use "lldb" if on macOS
+            "MIMode": "gdb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
