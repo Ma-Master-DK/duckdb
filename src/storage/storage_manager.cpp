@@ -191,7 +191,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		}
 
 		// Initialize the block manager before creating a new database.
-		auto sf_block_manager = make_uniq<SingleFileBlockManager>(db, path, options);
+		auto sf_block_manager = make_uniq<SingleNvmeBlockManager>(db, path, options);
 		sf_block_manager->CreateNewDatabase();
 		block_manager = std::move(sf_block_manager);
 		table_io_manager = make_uniq<SingleFileTableIOManager>(*block_manager, row_group_size);
@@ -203,7 +203,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		// Initialize the block manager while loading the database file.
 		// We'll construct the SingleFileBlockManager with the default block allocation size,
 		// and later adjust it when reading the file header.
-		auto sf_block_manager = make_uniq<SingleFileBlockManager>(db, path, options);
+		auto sf_block_manager = make_uniq<SingleNvmeBlockManager>(db, path, options);
 		sf_block_manager->LoadExistingDatabase();
 		block_manager = std::move(sf_block_manager);
 		table_io_manager = make_uniq<SingleFileTableIOManager>(*block_manager, row_group_size);

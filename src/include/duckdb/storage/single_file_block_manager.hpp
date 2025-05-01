@@ -9,9 +9,9 @@
 #pragma once
 
 #include "duckdb/common/common.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/storage/block.hpp"
-#include "duckdb/common/file_system.hpp"
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/common/set.hpp"
 #include "duckdb/common/vector.hpp"
@@ -47,8 +47,8 @@ public:
 	void LoadExistingDatabase();
 
 	//! Creates a new Block using the specified block_id and returns a pointer
-	unique_ptr<Block> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
-	unique_ptr<Block> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
+	unique_ptr<Block> ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) override;
+	unique_ptr<Block> CreateBlock(block_id_t block_id, NvmeBuffer *source_buffer) override;
 	//! Return the next free block id
 	block_id_t GetFreeBlockId() override;
 	//! Check the next free block id - but do not assign or allocate it
@@ -68,9 +68,9 @@ public:
 	//! Read the content of the block from disk
 	void Read(Block &block) override;
 	//! Read the content of a range of blocks into a buffer
-	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override;
+	void ReadBlocks(NvmeBuffer &buffer, block_id_t start_block, idx_t block_count) override;
 	//! Write the given block to disk
-	void Write(FileBuffer &block, block_id_t block_id) override;
+	void Write(NvmeBuffer &block, block_id_t block_id) override;
 	//! Write the header to disk, this is the final step of the checkpointing process
 	void WriteHeader(DatabaseHeader header) override;
 	//! Sync changes to the underlying file
@@ -95,8 +95,8 @@ private:
 	//!	to detect inconsistencies with the file header.
 	void Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size);
 
-	void ReadAndChecksum(FileBuffer &handle, uint64_t location) const;
-	void ChecksumAndWrite(FileBuffer &handle, uint64_t location) const;
+	void ReadAndChecksum(NvmeBuffer &buf, uint64_t location) const;
+	void ChecksumAndWrite(NvmeBuffer &buf, uint64_t location) const;
 
 	idx_t GetBlockLocation(block_id_t block_id);
 
@@ -118,10 +118,10 @@ private:
 	uint8_t active_header;
 	//! The path where the file is stored
 	string path;
-	//! The file handle
-	unique_ptr<FileHandle> handle;
+	//! The dev handle
+	xnvme_dev *handle;
 	//! The buffer used to read/write to the headers
-	FileBuffer header_buffer;
+	NvmeBuffer header_buffer;
 	//! The list of free blocks that can be written to currently
 	set<block_id_t> free_list;
 	//! The list of blocks that were freed since the last checkpoint.

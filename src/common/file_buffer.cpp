@@ -8,6 +8,9 @@
 #include "duckdb/storage/storage_info.hpp"
 #include <cstring>
 
+#include <libxnvme.h>
+#include <libxnvme_nvm.h>
+
 namespace duckdb {
 
 FileBuffer::FileBuffer(Allocator &allocator, FileBufferType type, uint64_t user_size)
@@ -42,6 +45,7 @@ FileBuffer::~FileBuffer() {
 	allocator.FreeData(internal_buffer, internal_size);
 }
 
+// TODOTODO: xnvme this
 void FileBuffer::ReallocBuffer(idx_t new_size) {
 	data_ptr_t new_buffer;
 	if (internal_buffer) {
@@ -89,15 +93,18 @@ void FileBuffer::Resize(uint64_t new_size) {
 void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 	handle.Read(internal_buffer, internal_size, location);
+	return; // TODOTODO: xnvme read here
 }
 
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 	handle.Write(internal_buffer, internal_size, location);
+	return; // TODOTODO: xnvme write here
 }
 
 void FileBuffer::Clear() {
-	memset(internal_buffer, 0, internal_size);
+	// memset(internal_buffer, 0, internal_size);
+	xnvme_buf_clear(internal_buffer, internal_size);
 }
 
 void FileBuffer::Initialize(DebugInitialize initialize) {
@@ -105,7 +112,8 @@ void FileBuffer::Initialize(DebugInitialize initialize) {
 		return;
 	}
 	uint8_t value = initialize == DebugInitialize::DEBUG_ZERO_INITIALIZE ? 0 : 0xFF;
-	memset(internal_buffer, value, internal_size);
+	// memset(internal_buffer, value, internal_size);
+	xnvme_buf_clear(internal_buffer, internal_size);
 }
 
 } // namespace duckdb

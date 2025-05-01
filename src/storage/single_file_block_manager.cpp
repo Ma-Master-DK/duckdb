@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 
 namespace duckdb {
 
@@ -43,14 +44,14 @@ void MainHeader::Write(WriteStream &ser) {
 	SerializeVersionNumber(ser, DuckDB::SourceID());
 }
 
-void MainHeader::CheckMagicBytes(FileHandle &handle) {
+void MainHeader::CheckMagicBytes(xnvme_dev &handle) {
 	data_t magic_bytes[MAGIC_BYTE_SIZE];
 	if (handle.GetFileSize() < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+		throw IOException("The device exists, but it is not a valid DuckDB database file!");
 	}
 	handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
 	if (memcmp(magic_bytes, MainHeader::MAGIC_BYTES, MainHeader::MAGIC_BYTE_SIZE) != 0) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+		throw IOException("The device exists, but it is not a valid DuckDB database file!");
 	}
 }
 
@@ -154,8 +155,7 @@ DatabaseHeader DeserializeDatabaseHeader(const MainHeader &main_header, data_ptr
 SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const string &path_p,
                                                const StorageManagerOptions &options)
     : BlockManager(BufferManager::GetBufferManager(db), options.block_alloc_size), db(db), path(path_p),
-      header_buffer(Allocator::Get(db), FileBufferType::MANAGED_BUFFER,
-                    Storage::FILE_HEADER_SIZE - Storage::DEFAULT_BLOCK_HEADER_SIZE),
+      header_buffer(NvmeBufferType::MANAGED_BUFFER, Storage::FILE_HEADER_SIZE - Storage::DEFAULT_BLOCK_HEADER_SIZE),
       iteration_count(0), options(options) {
 }
 
@@ -198,114 +198,96 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 }
 
 void SingleFileBlockManager::CreateNewDatabase() {
-	// auto flags = GetFileFlags(true);
+	// 'path' of device to use for DB, set as env variable for safety
+	// const char *env_device_path = std::getenv("XNVME_DEV_USE");
+	// if (!env_device_path) {
+	// 	throw IOException("Environment variable 'XNVME_DEV_USE' is not set.");
+	// }
 
-	// // open the RDBMS handle
-	// auto &fs = FileSystem::Get(db);
-	// handle = fs.OpenFile(path, flags); // TODOTODO: open device with xnvme here,
-	// https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
-
-	// we open the device with xnvme
-	// assuming only the db will on the device
-
-	const char *env_device_path = std::getenv("XNVME_DEV_USE");
-	if (!env_device_path) {
-		throw IOException("Environment variable 'XNVME_DEV_USE' is not set.");
-	}
-
-	// ----- GUIDE START -----
-
+	// set some default variables
 	struct xnvme_opts opts = xnvme_opts_default();
-	struct xnvme_dev *dev;
-	const struct xnvme_geo *geo;
-	uint32_t nsid = NULL;
-
-	size_t buf_nbytes;
 	char *buf = nullptr;
+	size_t buf_nbytes;
 
-	// to work: chmod 666 /dev/nvme1n1
-	// after: chmod 660 /dev/nvme1n1
-	dev = xnvme_dev_open(env_device_path, &opts);
-	if (!dev) {
-		int errnum = errno; // capture errno immediately
-		throw IOException("Cannot open database \"%s\" in read-only mode: %s (errno=%d)", env_device_path,
-		                  std::strerror(errnum), errnum);
+	// we open the device with xNVMe
+	handle = xnvme_dev_open(path.c_str(), &opts);
+	if (!handle) {
+		xnvme_cli_perr("xnvme_dev_open()", errno);
+		return;
 	}
 
-	nsid = xnvme_dev_get_nsid(dev);
-	geo = xnvme_dev_get_geo(dev);
+	// set values based on device
+	const struct xnvme_geo *geo = xnvme_dev_get_geo(handle);
+	buf_nbytes = geo->nbytes;
 
-	buf_nbytes = geo->lba_nbytes;
-	buf = static_cast<char *>(xnvme_buf_alloc(dev, buf_nbytes));
-	memset(buf, 0, buf_nbytes);
-
-	// WRITE HERE
-
-	xnvme_buf_free(dev, buf);
-	xnvme_dev_close(dev);
-
-	// ----- GUIDE DONE -----
+	xnvme_cli_pinf("Allocate a buffer of size: %zu", buf_nbytes);
+	buf = static_cast<char *>(xnvme_buf_alloc(handle, buf_nbytes));
+	if (!buf) {
+		xnvme_cli_perr("xnvme_buf_alloc()", errno);
+		goto exit;
+	}
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
 	header_buffer.Clear();
 
-	options.version_number = GetVersionNumber();
-	db.GetStorageManager().SetStorageVersion(options.storage_version.GetIndex());
-	AddStorageVersionTag();
+	// options.version_number = GetVersionNumber();
+	// db.GetStorageManager().SetStorageVersion(options.storage_version.GetIndex());
+	// AddStorageVersionTag();
+	// MainHeader main_header = ConstructMainHeader(options.version_number.GetIndex());
+	// SerializeHeaderStructure<MainHeader>(main_header, header_buffer.buffer);
+	// // now write the header to the file
+	// ChecksumAndWrite(header_buffer, 0);
+	// header_buffer.Clear();
 
-	MainHeader main_header = ConstructMainHeader(options.version_number.GetIndex());
-	SerializeHeaderStructure<MainHeader>(main_header, header_buffer.buffer);
-	// now write the header to the file
-	ChecksumAndWrite(header_buffer, 0);
-	header_buffer.Clear();
+	// // write the database headers
+	// // initialize meta_block and free_list to INVALID_BLOCK because the database file does not contain any actual
+	// // content yet
+	// DatabaseHeader h1;
+	// // header 1
+	// h1.iteration = 0;
+	// h1.meta_block = idx_t(INVALID_BLOCK);
+	// h1.free_list = idx_t(INVALID_BLOCK);
+	// h1.block_count = 0;
+	// // We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
+	// h1.block_alloc_size = GetBlockAllocSize();
+	// h1.vector_size = STANDARD_VECTOR_SIZE;
+	// h1.serialization_compatibility = options.storage_version.GetIndex();
+	// SerializeHeaderStructure<DatabaseHeader>(h1, header_buffer.buffer);
+	// ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE);
+	//
+	// // header 2
+	// DatabaseHeader h2;
+	// h2.iteration = 0;
+	// h2.meta_block = idx_t(INVALID_BLOCK);
+	// h2.free_list = idx_t(INVALID_BLOCK);
+	// h2.block_count = 0;
+	// // We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
+	// h2.block_alloc_size = GetBlockAllocSize();
+	// h2.vector_size = STANDARD_VECTOR_SIZE;
+	// h2.serialization_compatibility = options.storage_version.GetIndex();
+	// SerializeHeaderStructure<DatabaseHeader>(h2, header_buffer.buffer);
+	// ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
+	//
+	// // ensure that writing to disk is completed before returning
+	// handle
+	//     ->Sync(); // TODOTODO: sync device with xnvme here,
+	//     https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
+	// // we start with h2 as active_header, this way our initial write will be in h1
+	// iteration_count = 0;
+	// active_header = 1;
+	// max_block = 0;
 
-	// write the database headers
-	// initialize meta_block and free_list to INVALID_BLOCK because the database file does not contain any actual
-	// content yet
-	DatabaseHeader h1;
-	// header 1
-	h1.iteration = 0;
-	h1.meta_block = idx_t(INVALID_BLOCK);
-	h1.free_list = idx_t(INVALID_BLOCK);
-	h1.block_count = 0;
-	// We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
-	h1.block_alloc_size = GetBlockAllocSize();
-	h1.vector_size = STANDARD_VECTOR_SIZE;
-	h1.serialization_compatibility = options.storage_version.GetIndex();
-	SerializeHeaderStructure<DatabaseHeader>(h1, header_buffer.buffer);
-	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE);
-
-	// header 2
-	DatabaseHeader h2;
-	h2.iteration = 0;
-	h2.meta_block = idx_t(INVALID_BLOCK);
-	h2.free_list = idx_t(INVALID_BLOCK);
-	h2.block_count = 0;
-	// We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
-	h2.block_alloc_size = GetBlockAllocSize();
-	h2.vector_size = STANDARD_VECTOR_SIZE;
-	h2.serialization_compatibility = options.storage_version.GetIndex();
-	SerializeHeaderStructure<DatabaseHeader>(h2, header_buffer.buffer);
-	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
-
-	// ensure that writing to disk is completed before returning
-	handle
-	    ->Sync(); // TODOTODO: sync device with xnvme here, https://xnvme.io/api/c/nvme/xnvme_nvm.html#c.xnvme_nvm_write
-	// we start with h2 as active_header, this way our initial write will be in h1
-	iteration_count = 0;
-	active_header = 1;
-	max_block = 0;
+exit:
+	xnvme_buf_free(handle, buf);
+	xnvme_dev_close(handle);
+	return;
 }
 
 void SingleFileBlockManager::LoadExistingDatabase() {
-	auto flags = GetFileFlags(false);
+	struct xnvme_opts opts = xnvme_opts_default();
+	handle = xnvme_dev_open(path.c_str(), &opts);
 
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(
-	    path,
-	    flags); // TODOTODO: open device with xnvme here, https://xnvme.io/api/c/core/xnvme_dev.html#c.xnvme_dev_open
 	if (!handle) {
 		// this can only happen in read-only mode - as that is when we set FILE_FLAGS_NULL_IF_NOT_EXISTS
 		throw IOException("Cannot open database \"%s\" in read-only mode: database does not exist", path);
