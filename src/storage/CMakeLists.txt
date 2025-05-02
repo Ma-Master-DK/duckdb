@@ -14,6 +14,8 @@ add_library_unity(
   checkpoint_manager.cpp
   temporary_memory_manager.cpp
   block.cpp
+  file_block.cpp
+  nvme_block.cpp
   data_pointer.cpp
   data_table.cpp
   index.cpp
@@ -27,6 +29,7 @@ add_library_unity(
   optimistic_data_writer.cpp
   partial_block_manager.cpp
   single_file_block_manager.cpp
+  single_nvme_block_manager.cpp
   storage_info.cpp
   storage_lock.cpp
   wal_replay.cpp)

@@ -308,6 +308,7 @@ void FixedSizeAllocator::Init(const FixedSizeAllocatorInfo &info) {
 		// create the FixedSizeBuffer
 		buffers[buffer_id] =
 		    make_uniq<FixedSizeBuffer>(block_manager, segment_count, allocation_size, buffer_block_pointer);
+
 		total_segment_count += segment_count;
 	}
 
@@ -317,7 +318,6 @@ void FixedSizeAllocator::Init(const FixedSizeAllocatorInfo &info) {
 }
 
 void FixedSizeAllocator::Deserialize(MetadataManager &metadata_manager, const BlockPointer &block_pointer) {
-
 	MetadataReader reader(metadata_manager, block_pointer);
 	segment_size = reader.Read<idx_t>();
 	auto buffer_count = reader.Read<idx_t>();

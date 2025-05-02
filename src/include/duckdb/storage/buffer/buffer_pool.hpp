@@ -11,6 +11,7 @@
 #include "duckdb/common/array.hpp"
 #include "duckdb/common/enums/memory_tag.hpp"
 #include "duckdb/common/file_buffer.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/common/typedefs.hpp"
 #include "duckdb/storage/buffer/block_handle.hpp"

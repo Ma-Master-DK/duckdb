@@ -8,27 +8,19 @@
 #include "duckdb/storage/storage_info.hpp"
 #include <cstring>
 
-#include <libxnvme.h>
-#include <libxnvme_nvm.h>
-
 namespace duckdb {
 
 FileBuffer::FileBuffer(Allocator &allocator, FileBufferType type, uint64_t user_size)
-    : allocator(allocator), type(type) {
+    : DBBuffer(), allocator(allocator), type(type) {
 	Init();
+
 	if (user_size) {
 		Resize(user_size);
 	}
 }
 
-void FileBuffer::Init() {
-	buffer = nullptr;
-	size = 0;
-	internal_buffer = nullptr;
-	internal_size = 0;
-}
-
-FileBuffer::FileBuffer(FileBuffer &source, FileBufferType type_p) : allocator(source.allocator), type(type_p) {
+FileBuffer::FileBuffer(FileBuffer &source, FileBufferType type_p)
+    : DBBuffer(), allocator(source.allocator), type(type_p) {
 	// take over the structures of the source buffer
 	buffer = source.buffer;
 	size = source.size;
@@ -42,12 +34,20 @@ FileBuffer::~FileBuffer() {
 	if (!internal_buffer) {
 		return;
 	}
+
 	allocator.FreeData(internal_buffer, internal_size);
 }
 
-// TODOTODO: xnvme this
+void FileBuffer::Init() {
+	buffer = nullptr;
+	size = 0;
+	internal_buffer = nullptr;
+	internal_size = 0;
+}
+
 void FileBuffer::ReallocBuffer(idx_t new_size) {
 	data_ptr_t new_buffer;
+
 	if (internal_buffer) {
 		new_buffer = allocator.ReallocateData(internal_buffer, internal_size, new_size);
 	} else {
@@ -58,6 +58,7 @@ void FileBuffer::ReallocBuffer(idx_t new_size) {
 	if (!new_buffer) {
 		throw std::bad_alloc();
 	}
+
 	internal_buffer = new_buffer;
 	internal_size = new_size;
 
@@ -77,6 +78,7 @@ FileBuffer::MemoryRequirement FileBuffer::CalculateMemory(uint64_t user_size) {
 		result.header_size = Storage::DEFAULT_BLOCK_HEADER_SIZE;
 		result.alloc_size = AlignValue<idx_t, Storage::SECTOR_SIZE>(result.header_size + user_size);
 	}
+
 	return result;
 }
 
@@ -93,27 +95,26 @@ void FileBuffer::Resize(uint64_t new_size) {
 void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 	handle.Read(internal_buffer, internal_size, location);
-	return; // TODOTODO: xnvme read here
+	return;
 }
 
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 	handle.Write(internal_buffer, internal_size, location);
-	return; // TODOTODO: xnvme write here
+	return;
 }
 
 void FileBuffer::Clear() {
-	// memset(internal_buffer, 0, internal_size);
-	xnvme_buf_clear(internal_buffer, internal_size);
+	memset(internal_buffer, 0, internal_size);
 }
 
 void FileBuffer::Initialize(DebugInitialize initialize) {
 	if (initialize == DebugInitialize::NO_INITIALIZE) {
 		return;
 	}
+
 	uint8_t value = initialize == DebugInitialize::DEBUG_ZERO_INITIALIZE ? 0 : 0xFF;
-	// memset(internal_buffer, value, internal_size);
-	xnvme_buf_clear(internal_buffer, internal_size);
+	memset(internal_buffer, value, internal_size);
 }
 
 } // namespace duckdb

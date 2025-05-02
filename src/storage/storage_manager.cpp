@@ -12,6 +12,7 @@
 #include "duckdb/storage/in_memory_block_manager.hpp"
 #include "duckdb/storage/object_cache.hpp"
 #include "duckdb/storage/single_file_block_manager.hpp"
+#include "duckdb/storage/single_nvme_block_manager.hpp"
 #include "duckdb/transaction/transaction_manager.hpp"
 #include "duckdb/common/serializer/memory_stream.hpp"
 #include "duckdb/storage/storage_extension.hpp"
@@ -141,7 +142,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	auto &fs = FileSystem::Get(db);
 	auto &config = DBConfig::Get(db);
 
-	StorageManagerOptions options;
+	NvmeStorageManagerOptions options;
 	options.read_only = read_only;
 	options.use_direct_io = config.options.use_direct_io;
 	options.debug_initialize = config.options.debug_initialize;

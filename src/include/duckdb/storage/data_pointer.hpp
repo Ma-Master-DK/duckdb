@@ -11,7 +11,8 @@
 #include "duckdb/common/common.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/storage/storage_info.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
+#include "duckdb/storage/nvme_block.hpp"
 #include "duckdb/storage/table/row_group.hpp"
 #include "duckdb/common/enums/compression_type.hpp"
 

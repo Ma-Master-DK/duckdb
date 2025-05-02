@@ -64,6 +64,7 @@
 #include "duckdb/common/exception_format_value.hpp"
 #include "duckdb/common/extra_type_info.hpp"
 #include "duckdb/common/file_buffer.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
 #include "duckdb/common/file_open_flags.hpp"
 #include "duckdb/common/multi_file_list.hpp"
 #include "duckdb/common/multi_file_reader_function.hpp"

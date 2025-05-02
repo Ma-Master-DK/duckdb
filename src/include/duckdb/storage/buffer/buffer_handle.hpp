@@ -10,6 +10,7 @@
 
 #include "duckdb/storage/storage_info.hpp"
 #include "duckdb/common/file_buffer.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
 
 namespace duckdb {
 class BlockHandle;

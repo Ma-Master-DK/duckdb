@@ -9,10 +9,12 @@
 #pragma once
 
 #include "duckdb/common/common.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
+#include "duckdb/storage/nvme_block.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/common/set.hpp"
 #include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/metadata/metadata.hpp"
 
 namespace duckdb {
 class DatabaseInstance;

@@ -1,4 +1,4 @@
-#include "duckdb/storage/single_file_block_manager.hpp"
+#include "duckdb/storage/single_base_block_manager.hpp"
 
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/checksum.hpp"
@@ -39,17 +39,6 @@ void MainHeader::Write(WriteStream &ser) {
 	}
 	SerializeVersionNumber(ser, DuckDB::LibraryVersion());
 	SerializeVersionNumber(ser, DuckDB::SourceID());
-}
-
-void MainHeader::CheckMagicBytes(FileHandle &handle) {
-	data_t magic_bytes[MAGIC_BYTE_SIZE];
-	if (handle.GetFileSize() < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
-	}
-	handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
-	if (memcmp(magic_bytes, MainHeader::MAGIC_BYTES, MainHeader::MAGIC_BYTE_SIZE) != 0) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
-	}
 }
 
 MainHeader MainHeader::Read(ReadStream &source) {
@@ -149,7 +138,8 @@ DatabaseHeader DeserializeDatabaseHeader(const MainHeader &main_header, data_ptr
 	return DatabaseHeader::Read(main_header, source);
 }
 
-SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const string &path_p,
+// TODOTODO: continue from here
+SingleFileBlockManager::SingleBaseBlockManager(AttachedDatabase &db, const string &path_p,
                                                const FileStorageManagerOptions &options)
     : BlockManager(BufferManager::GetBufferManager(db), options.block_alloc_size), db(db), path(path_p),
       header_buffer(Allocator::Get(db), FileBufferType::MANAGED_BUFFER,

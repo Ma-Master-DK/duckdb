@@ -16,10 +16,12 @@
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/parser/column_list.hpp"
 #include "duckdb/storage/table/segment_base.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
+#include "duckdb/storage/nvme_block.hpp"
 #include "duckdb/common/enums/checkpoint_type.hpp"
 #include "duckdb/storage/storage_index.hpp"
 #include "duckdb/function/partition_stats.hpp"
+#include "duckdb/storage/metadata/metadata.hpp"
 
 namespace duckdb {
 class AttachedDatabase;

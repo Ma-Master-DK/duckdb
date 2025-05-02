@@ -1,7 +1,9 @@
 #include "duckdb/storage/buffer/block_handle.hpp"
 
 #include "duckdb/common/file_buffer.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
+#include "duckdb/storage/file_block.hpp"
+#include "duckdb/storage/nvme_block.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/storage/buffer/buffer_handle.hpp"
 #include "duckdb/storage/buffer/buffer_pool.hpp"
@@ -57,23 +59,30 @@ BlockHandle::~BlockHandle() { // NOLINT: allow internal exceptions
 	}
 }
 
-unique_ptr<Block> AllocateBlock(BlockManager &block_manager, unique_ptr<FileBuffer> reusable_buffer,
-                                block_id_t block_id) {
+unique_ptr<FileBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<FileBuffer> reusable_buffer,
+                                    block_id_t block_id) {
 	if (reusable_buffer) {
 		// re-usable buffer: re-use it
 		if (reusable_buffer->GetBufferType() == FileBufferType::BLOCK) {
 			// we can reuse the buffer entirely
-			auto &block = reinterpret_cast<Block &>(*reusable_buffer);
+			auto &block = reinterpret_cast<FileBlock &>(*reusable_buffer);
 			block.id = block_id;
-			return unique_ptr_cast<FileBuffer, Block>(std::move(reusable_buffer));
+			return unique_ptr_cast<FileBuffer, FileBlock>(std::move(reusable_buffer));
 		}
 		auto block = block_manager.CreateBlock(block_id, reusable_buffer.get());
 		reusable_buffer.reset();
 		return block;
 	} else {
 		// no re-usable buffer: allocate a new block
-		return block_manager.CreateBlock(block_id, nullptr);
+		return block_manager.CreateBlock(block_id, (FileBuffer *)nullptr);
 	}
+}
+
+unique_ptr<NvmeBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<NvmeBuffer> reusable_buffer,
+                                    block_id_t block_id) {
+	auto &block = reinterpret_cast<FileBlock &>(*reusable_buffer);
+	block.id = block_id;
+	return unique_ptr_cast<NvmeBuffer, NvmeBlock>(std::move(reusable_buffer));
 }
 
 void BlockHandle::ChangeMemoryUsage(BlockLock &l, int64_t delta) {

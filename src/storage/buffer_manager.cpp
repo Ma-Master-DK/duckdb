@@ -3,6 +3,7 @@
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_buffer.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
 #include "duckdb/storage/buffer/buffer_pool.hpp"
 #include "duckdb/storage/standard_buffer_manager.hpp"
 
