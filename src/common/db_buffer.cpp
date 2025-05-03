@@ -8,6 +8,6 @@
 
 namespace duckdb {
 
-DBBuffer::DBBuffer() {
+DBBuffer::DBBuffer(DBBufferType type) : type(type) {
 }
 } // namespace duckdb

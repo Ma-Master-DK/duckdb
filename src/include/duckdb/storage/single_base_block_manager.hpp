@@ -32,18 +32,16 @@ struct StorageManagerOptions {
 
 //! SingleFileBlockManager is an implementation for a BlockManager which manages blocks in a single file
 class SingleBaseBlockManager : public BlockManager {
-	//! The location in the file where the block writing starts
-	static constexpr uint64_t BLOCK_START; // = Storage::FILE_HEADER_SIZE * 3;
 
 public:
 	SingleBaseBlockManager(AttachedDatabase &db, const string &path, const StorageManagerOptions &options);
 
 	//! Creates a new database.
-	void CreateNewDatabase();
+	virtual void CreateNewDatabase();
 
 	//! Loads an existing database. We pass the provided block allocation size as a parameter
 	//! to detect inconsistencies with the file header.
-	void LoadExistingDatabase();
+	virtual void LoadExistingDatabase();
 
 	//! Return the next free block id
 	block_id_t GetFreeBlockId() override;
@@ -70,16 +68,7 @@ public:
 	idx_t GetMetaBlock() override;
 
 	//! Read the content of the block from disk
-	void Read(FileBlock &block) override;
-
-	//! Write the header to disk, this is the final step of the checkpointing process
-	void WriteHeader(DatabaseHeader header) override;
-
-	//! Sync changes to the underlying file
-	void FileSync() override;
-
-	//! Truncate the underlying database file after a checkpoint
-	void Truncate() override;
+	void Read(Block &block) override;
 
 	bool InMemory() override {
 		return false;
@@ -91,10 +80,7 @@ public:
 	//! Returns the number of free blocks
 	idx_t FreeBlocks() override;
 
-	//! Whether or not the attached database is a remote file
-	bool IsRemote() override;
-
-private:
+protected:
 	//! Loads the free list of the file.
 	void LoadFreeList();
 
@@ -107,7 +93,7 @@ private:
 	//! Return the blocks to which we will write the free list and modified blocks
 	vector<MetadataHandle> GetFreeListBlocks();
 
-	void TrimFreeBlocks();
+	virtual void TrimFreeBlocks();
 
 	void IncreaseBlockReferenceCountInternal(block_id_t block_id);
 
@@ -118,11 +104,19 @@ private:
 
 	uint64_t GetVersionNumber();
 
-private:
+	MainHeader ConstructMainHeader(idx_t version_number);
+	void SerializeHeaderStructure(T header, data_ptr_t ptr);
+	MainHeader DeserializeMainHeader(data_ptr_t ptr);
+	DatabaseHeader DeserializeDatabaseHeader(const Mainheader &main_header, data_ptr_t ptr);
+
+protected:
 	AttachedDatabase &db;
 
 	//! The active DatabaseHeader, either 0 (h1) or 1 (h2)
 	uint8_t active_header;
+
+	//! The storage manager options
+	StorageManagerOptions options;
 
 	//! The list of free blocks that can be written to currently
 	set<block_id_t> free_list;
@@ -149,9 +143,6 @@ private:
 
 	//! The current header iteration count
 	uint64_t iteration_count;
-
-	//! The storage manager options
-	FileStorageManagerOptions options;
 
 	//! Lock for performing various operations in the single file block manager
 	mutex block_lock;

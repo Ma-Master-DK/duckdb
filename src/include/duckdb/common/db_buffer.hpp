@@ -13,10 +13,14 @@
 
 namespace duckdb {
 
+enum class DBBufferType : uint8_t { BLOCK = 1, MANAGED_BUFFER = 2, TINY_BUFFER = 3 };
+
+static constexpr idx_t DB_BUFFER_TYPE_COUNT = 3;
+
 //! The FileBuffer represents a buffer that can be read or written to a Direct IO FileHandle.
 class DBBuffer {
 public:
-	DBBuffer();
+	DBBuffer(DBBufferType type);
 
 	virtual ~DBBuffer();
 
@@ -28,7 +32,7 @@ public:
 	uint64_t size;
 
 public:
-	void Clear();
+	virtual void Clear();
 
 	uint64_t AllocSize() const {
 		return internal_size;
@@ -36,6 +40,10 @@ public:
 
 	uint64_t Size() const {
 		return size;
+	}
+
+	DBBufferType GetBufferType() const {
+		return type;
 	}
 
 	data_ptr_t InternalBuffer() {
@@ -47,7 +55,13 @@ public:
 		idx_t header_size;
 	};
 
+	// Same rules as the constructor. We add room for a header, in addition to
+	// the requested user bytes. We then sector-align the result.
+	virtual void Resize(uint64_t user_size);
+
 protected:
+	DBBufferType type;
+
 	//! The pointer to the internal buffer that will be read from or written to.
 	//! This includes the buffer header.
 	data_ptr_t internal_buffer;

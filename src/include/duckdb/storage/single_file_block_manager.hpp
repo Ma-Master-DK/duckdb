@@ -17,20 +17,41 @@ namespace duckdb {
 //! SingleFileBlockManager is an implementation for a BlockManager which manages blocks in a single file
 // class SingleFileBlockManager : SingleBaseBlockManager(Storage::FILE_HEADER_SIZE) {
 class SingleFileBlockManager : SingleBaseBlockManager {
+	//! The location in the file where the block writing starts
+	static constexpr uint64_t BLOCK_START = Storage::FILE_HEADER_SIZE * 3;
+
 public:
 	SingleFileBlockManager(AttachedDatabase &db, const string &path, const StorageManagerOptions &options);
+
+	void CreateNewDatabase() override;
+	void LoadExistingDatabase() override;
 
 	FileOpenFlags GetFileFlags(bool create_new) const;
 
 	//! Creates a new Block using the specified block_id and returns a pointer
-	unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
-	unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
+	unique_ptr<Block> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
+	unique_ptr<Block> ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) override {
+		throw NotImplementedException("ConvertBlock(NvmeBuffer) not supported in SingleFileBlockManager");
+	}
+
+	unique_ptr<Block> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
+	unique_ptr<Block> CreateBlock(block_id_t block_id, NvmeBuffer &source_buffer) override {
+		throw NotImplementedException("CreateBlock(NvmeBuffer) not supported in SingleFileBlockManager");
+	}
 
 	//! Read the content of a range of blocks into a buffer
 	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override;
 
+	void TrimFreeBlocks() override;
+
 	//! Write the given block to disk
 	void Write(FileBuffer &block, block_id_t block_id) override;
+	void WriteHeader(DatabaseHeader header) override;
+
+	void Truncate() override;
+	void FileSync() override;
+
+	bool IsRemote() override;
 
 private:
 	void ReadAndChecksum(FileBuffer &handle, uint64_t location) const;

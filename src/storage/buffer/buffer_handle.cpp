@@ -7,7 +7,7 @@ namespace duckdb {
 BufferHandle::BufferHandle() : handle(nullptr), node(nullptr) {
 }
 
-BufferHandle::BufferHandle(shared_ptr<BlockHandle> handle_p, optional_ptr<FileBuffer> node_p)
+BufferHandle::BufferHandle(shared_ptr<BlockHandle> handle_p, optional_ptr<DBBuffer> node_p)
     : handle(std::move(handle_p)), node(node_p) {
 }
 
@@ -39,7 +39,7 @@ void BufferHandle::Destroy() {
 	node = nullptr;
 }
 
-FileBuffer &BufferHandle::GetFileBuffer() {
+DBBuffer &BufferHandle::GetDBBuffer() {
 	D_ASSERT(node);
 	return *node;
 }

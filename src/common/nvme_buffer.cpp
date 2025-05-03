@@ -10,15 +10,15 @@
 
 namespace duckdb {
 
-NvmeBuffer::NvmeBuffer() : DBBuffer() {
+NvmeBuffer::NvmeBuffer() : DBBuffer(DBBufferType::BLOCK) {
 	Init(nullptr);
 }
 
-NvmeBuffer::NvmeBuffer(xnvme_dev *dev) : DBBuffer() {
+NvmeBuffer::NvmeBuffer(xnvme_dev *dev) : DBBuffer(DBBufferType::BLOCK) {
 	Init(dev);
 }
 
-NvmeBuffer::NvmeBuffer(NvmeBuffer &source) : DBBuffer() {
+NvmeBuffer::NvmeBuffer(NvmeBuffer &source) : DBBuffer(DBBufferType::BLOCK) {
 	// take over the structures of the source buffer
 	buffer = source.buffer;
 	size = source.size;

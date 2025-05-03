@@ -13,9 +13,6 @@
 
 namespace duckdb {
 
-class Serializer;
-class Deserializer;
-
 class NvmeBlock : public Block, public NvmeBuffer {
 public:
 	NvmeBlock(NvmeBuffer &source, block_id_t id);

@@ -4,7 +4,7 @@
 
 namespace duckdb {
 
-NvmeBlock::NvmeBlock(NvmeBuffer &source, block_id_t id) : Block(id), NvmeBuffer(source) {
+NvmeBlock::NvmeBlock(NvmeBuffer &source, block_id_t id) : Block(id, DBBufferType::BLOCK), NvmeBuffer(source) {
 	D_ASSERT((AllocSize() & (Storage::SECTOR_SIZE - 1)) == 0);
 }
 

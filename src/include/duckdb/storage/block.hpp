@@ -17,9 +17,9 @@ namespace duckdb {
 class Serializer;
 class Deserializer;
 
-class Block {
+class Block : public DBBuffer {
 public:
-	Block(block_id_t id);
+	Block(block_id_t id, DBBufferType type);
 
 	block_id_t id;
 };

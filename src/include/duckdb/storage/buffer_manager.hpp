@@ -76,8 +76,8 @@ public:
 	virtual bool HasTemporaryDirectory() const;
 
 	//! Construct a managed buffer.
-	virtual unique_ptr<FileBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
-	                                                      FileBufferType type = FileBufferType::MANAGED_BUFFER);
+	virtual unique_ptr<DBBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<DBBuffer> &&source,
+	                                                    DBBufferType type = DBBufferType::MANAGED_BUFFER);
 	//! Get the underlying buffer pool responsible for managing the buffers
 	virtual BufferPool &GetBufferPool() const;
 
@@ -101,9 +101,8 @@ public:
 protected:
 	virtual void PurgeQueue(const BlockHandle &handle) = 0;
 	virtual void AddToEvictionQueue(shared_ptr<BlockHandle> &handle);
-	virtual void WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, FileBuffer &buffer);
-	virtual unique_ptr<FileBuffer> ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
-	                                                   unique_ptr<FileBuffer> buffer);
+	virtual void WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, DBBuffer &buffer);
+	virtual unique_ptr<DBBuffer> ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block, unique_ptr<DBBuffer> buffer);
 	virtual void DeleteTemporaryFile(BlockHandle &block);
 };
 

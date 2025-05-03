@@ -189,7 +189,7 @@ void MetadataManager::Flush() {
 		} else {
 			// already a persistent block - only need to write it
 			D_ASSERT(block.block->BlockId() == block.block_id);
-			block_manager.Write(handle.GetFileBuffer(), block.block_id);
+			block_manager.Write(handle.GetDBBuffer(), block.block_id);
 		}
 	}
 }

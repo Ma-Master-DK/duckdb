@@ -95,8 +95,8 @@ public:
 	}
 
 	//! Construct a managed buffer.
-	unique_ptr<FileBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
-	                                              FileBufferType type = FileBufferType::MANAGED_BUFFER) override;
+	unique_ptr<DBBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<DBBuffer> &&source,
+	                                            DBBufferType type = DBBufferType::MANAGED_BUFFER) override;
 
 	DUCKDB_API void ReserveMemory(idx_t size) final;
 	DUCKDB_API void FreeReservedMemory(idx_t size) final;
@@ -105,7 +105,7 @@ public:
 protected:
 	//! Helper
 	template <typename... ARGS>
-	TempBufferPoolReservation EvictBlocksOrThrow(MemoryTag tag, idx_t memory_delta, unique_ptr<FileBuffer> *buffer,
+	TempBufferPoolReservation EvictBlocksOrThrow(MemoryTag tag, idx_t memory_delta, unique_ptr<DBBuffer> *buffer,
 	                                             ARGS...);
 
 	//! Register an in-memory buffer of arbitrary size, as long as it is >= BLOCK_SIZE. can_destroy signifies whether or
@@ -126,10 +126,10 @@ protected:
 	TemporaryMemoryManager &GetTemporaryMemoryManager() final;
 
 	//! Write a temporary buffer to disk
-	void WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, FileBuffer &buffer) final;
+	void WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, DBBuffer &buffer) final;
 	//! Read a temporary buffer from disk
-	unique_ptr<FileBuffer> ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
-	                                           unique_ptr<FileBuffer> buffer = nullptr) final;
+	unique_ptr<DBBuffer> ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
+	                                         unique_ptr<DBBuffer> buffer = nullptr) final;
 	//! Get the path of the temporary buffer
 	string GetTemporaryPath(block_id_t id);
 

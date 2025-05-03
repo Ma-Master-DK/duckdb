@@ -17,7 +17,7 @@
 namespace duckdb {
 
 //! The NvmeBuffer represents a buffer that can be read or written to a Direct IO FileHandle.
-class NvmeBuffer : DBBuffer {
+class NvmeBuffer : public DBBuffer {
 public:
 	NvmeBuffer();
 	explicit NvmeBuffer(xnvme_dev *dev);
@@ -35,6 +35,8 @@ public:
 	void Write(uint64_t location);
 
 	void ReallocBuffer();
+
+	void Clear() override;
 
 protected:
 	void Init(xnvme_dev *dev);

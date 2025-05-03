@@ -14,9 +14,6 @@
 
 namespace duckdb {
 
-class Serializer;
-class Deserializer;
-
 class FileBlock : public Block, public FileBuffer {
 public:
 	FileBlock(Allocator &allocator, const block_id_t id, const idx_t block_size);

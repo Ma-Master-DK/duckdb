@@ -12,7 +12,7 @@
 namespace duckdb {
 
 BlockHandle::BlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag)
-    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(FileBufferType::BLOCK),
+    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(DBBufferType::BLOCK),
       buffer(nullptr), eviction_seq_num(0), destroy_buffer_upon(DestroyBufferUpon::BLOCK),
       memory_charge(tag, block_manager.buffer_manager.GetBufferPool()), unswizzled(nullptr),
       eviction_queue_idx(DConstants::INVALID_INDEX) {
@@ -22,7 +22,7 @@ BlockHandle::BlockHandle(BlockManager &block_manager, block_id_t block_id_p, Mem
 }
 
 BlockHandle::BlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag,
-                         unique_ptr<FileBuffer> buffer_p, DestroyBufferUpon destroy_buffer_upon_p, idx_t block_size,
+                         unique_ptr<DBBuffer> buffer_p, DestroyBufferUpon destroy_buffer_upon_p, idx_t block_size,
                          BufferPoolReservation &&reservation)
     : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(buffer_p->GetBufferType()),
       eviction_seq_num(0), destroy_buffer_upon(destroy_buffer_upon_p),
@@ -38,7 +38,7 @@ BlockHandle::~BlockHandle() { // NOLINT: allow internal exceptions
 	// being destroyed, so any unswizzled pointers are just binary junk now.
 	unswizzled = nullptr;
 	D_ASSERT(!buffer || buffer->GetBufferType() == buffer_type);
-	if (buffer && buffer_type != FileBufferType::TINY_BUFFER) {
+	if (buffer && buffer_type != DBBufferType::TINY_BUFFER) {
 		// we kill the latest version in the eviction queue
 		auto &buffer_manager = block_manager.buffer_manager;
 		buffer_manager.GetBufferPool().IncrementDeadNodes(*this);
@@ -59,11 +59,11 @@ BlockHandle::~BlockHandle() { // NOLINT: allow internal exceptions
 	}
 }
 
-unique_ptr<FileBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<FileBuffer> reusable_buffer,
-                                    block_id_t block_id) {
+unique_ptr<Block> AllocateBlock(BlockManager &block_manager, unique_ptr<FileBuffer> reusable_buffer,
+                                block_id_t block_id) {
 	if (reusable_buffer) {
 		// re-usable buffer: re-use it
-		if (reusable_buffer->GetBufferType() == FileBufferType::BLOCK) {
+		if (reusable_buffer->GetBufferType() == DBBufferType::BLOCK) {
 			// we can reuse the buffer entirely
 			auto &block = reinterpret_cast<FileBlock &>(*reusable_buffer);
 			block.id = block_id;
@@ -78,11 +78,24 @@ unique_ptr<FileBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<File
 	}
 }
 
-unique_ptr<NvmeBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<NvmeBuffer> reusable_buffer,
-                                    block_id_t block_id) {
+unique_ptr<Block> AllocateBlock(BlockManager &block_manager, unique_ptr<NvmeBuffer> reusable_buffer,
+                                block_id_t block_id) {
 	auto &block = reinterpret_cast<FileBlock &>(*reusable_buffer);
 	block.id = block_id;
 	return unique_ptr_cast<NvmeBuffer, NvmeBlock>(std::move(reusable_buffer));
+}
+
+unique_ptr<Block> AllocateBlock(BlockManager &block_manager, unique_ptr<DBBuffer> reusable_buffer,
+                                block_id_t block_id) {
+	if (dynamic_cast<FileBuffer *>(reusable_buffer.get())) {
+		auto casted = unique_ptr_cast<DBBuffer, FileBuffer>(std::move(reusable_buffer));
+		return AllocateBlock(block_manager, std::move(casted), block_id);
+	} else if (dynamic_cast<NvmeBuffer *>(reusable_buffer.get())) {
+		auto casted = unique_ptr_cast<DBBuffer, NvmeBuffer>(std::move(reusable_buffer));
+		return AllocateBlock(block_manager, std::move(casted), block_id);
+	} else {
+		throw IOException("Could not determine buffer type.");
+	}
 }
 
 void BlockHandle::ChangeMemoryUsage(BlockLock &l, int64_t delta) {
@@ -93,7 +106,7 @@ void BlockHandle::ChangeMemoryUsage(BlockLock &l, int64_t delta) {
 	memory_charge.Resize(memory_usage);
 }
 
-unique_ptr<FileBuffer> &BlockHandle::GetBuffer(BlockLock &l) {
+unique_ptr<DBBuffer> &BlockHandle::GetBuffer(BlockLock &l) {
 	VerifyMutex(l);
 	return buffer;
 }
@@ -128,7 +141,7 @@ void BlockHandle::ResizeBuffer(BlockLock &l, idx_t block_size, int64_t memory_de
 	D_ASSERT(memory_usage == buffer->AllocSize());
 }
 
-BufferHandle BlockHandle::LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_ptr<FileBuffer> reusable_buffer,
+BufferHandle BlockHandle::LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_ptr<DBBuffer> reusable_buffer,
                                          BufferPoolReservation reservation) {
 	VerifyMutex(l);
 
@@ -144,7 +157,7 @@ BufferHandle BlockHandle::LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_p
 	return BufferHandle(shared_from_this(), buffer.get());
 }
 
-BufferHandle BlockHandle::Load(unique_ptr<FileBuffer> reusable_buffer) {
+BufferHandle BlockHandle::Load(unique_ptr<DBBuffer> reusable_buffer) {
 	if (state == BlockState::BLOCK_LOADED) {
 		// already loaded
 		D_ASSERT(buffer);
@@ -168,7 +181,7 @@ BufferHandle BlockHandle::Load(unique_ptr<FileBuffer> reusable_buffer) {
 	return BufferHandle(shared_from_this(), buffer.get());
 }
 
-unique_ptr<FileBuffer> BlockHandle::UnloadAndTakeBlock(BlockLock &lock) {
+unique_ptr<DBBuffer> BlockHandle::UnloadAndTakeBlock(BlockLock &lock) {
 	VerifyMutex(lock);
 
 	if (state == BlockState::BLOCK_UNLOADED) {
@@ -212,7 +225,7 @@ bool BlockHandle::CanUnload() const {
 	return true;
 }
 
-void BlockHandle::ConvertToPersistent(BlockLock &l, BlockHandle &new_block, unique_ptr<FileBuffer> new_buffer) {
+void BlockHandle::ConvertToPersistent(BlockLock &l, BlockHandle &new_block, unique_ptr<DBBuffer> new_buffer) {
 	VerifyMutex(l);
 
 	// move the data from the old block into data for the new block

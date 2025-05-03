@@ -142,7 +142,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	auto &fs = FileSystem::Get(db);
 	auto &config = DBConfig::Get(db);
 
-	NvmeStorageManagerOptions options;
+	StorageManagerOptions options;
 	options.read_only = read_only;
 	options.use_direct_io = config.options.use_direct_io;
 	options.debug_initialize = config.options.debug_initialize;

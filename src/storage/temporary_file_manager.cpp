@@ -194,8 +194,8 @@ TemporaryFileIndex TemporaryFileHandle::TryGetBlockIndex() {
 	return TemporaryFileIndex(identifier, block_index);
 }
 
-unique_ptr<FileBuffer> TemporaryFileHandle::ReadTemporaryBuffer(idx_t block_index,
-                                                                unique_ptr<FileBuffer> reusable_buffer) const {
+unique_ptr<DBBuffer> TemporaryFileHandle::ReadTemporaryBuffer(idx_t block_index,
+                                                              unique_ptr<DBBuffer> reusable_buffer) const {
 	auto &buffer_manager = BufferManager::GetBufferManager(db);
 	if (identifier.size == TemporaryBufferSize::DEFAULT) {
 		return StandardBufferManager::ReadTemporaryBufferInternal(
@@ -221,7 +221,7 @@ unique_ptr<FileBuffer> TemporaryFileHandle::ReadTemporaryBuffer(idx_t block_inde
 	return buffer;
 }
 
-void TemporaryFileHandle::WriteTemporaryBuffer(FileBuffer &buffer, const idx_t block_index,
+void TemporaryFileHandle::WriteTemporaryBuffer(DBBuffer &buffer, const idx_t block_index,
                                                AllocatedData &compressed_buffer) const {
 	// We group DEFAULT_BLOCK_ALLOC_SIZE blocks into the same file.
 	D_ASSERT(buffer.AllocSize() == BufferManager::GetBufferManager(db).GetBlockAllocSize());
@@ -425,7 +425,7 @@ TemporaryFileManager::~TemporaryFileManager() {
 TemporaryFileManager::TemporaryFileManagerLock::TemporaryFileManagerLock(mutex &mutex) : lock(mutex) {
 }
 
-void TemporaryFileManager::WriteTemporaryBuffer(block_id_t block_id, FileBuffer &buffer) {
+void TemporaryFileManager::WriteTemporaryBuffer(block_id_t block_id, DBBuffer &buffer) {
 	// We group DEFAULT_BLOCK_ALLOC_SIZE blocks into the same file.
 	D_ASSERT(buffer.AllocSize() == BufferManager::GetBufferManager(db).GetBlockAllocSize());
 
@@ -469,7 +469,7 @@ void TemporaryFileManager::WriteTemporaryBuffer(block_id_t block_id, FileBuffer 
 }
 
 TemporaryFileManager::CompressionResult
-TemporaryFileManager::CompressBuffer(TemporaryFileCompressionAdaptivity &compression_adaptivity, FileBuffer &buffer,
+TemporaryFileManager::CompressBuffer(TemporaryFileCompressionAdaptivity &compression_adaptivity, DBBuffer &buffer,
                                      AllocatedData &compressed_buffer) {
 	if (buffer.AllocSize() <= TemporaryBufferSizeToSize(MinimumCompressedTemporaryBufferSize())) {
 		// Buffer size is less or equal to the minimum compressed size - no point compressing
@@ -566,8 +566,7 @@ void TemporaryFileManager::DecreaseSizeOnDisk(idx_t bytes) {
 	size_on_disk -= bytes;
 }
 
-unique_ptr<FileBuffer> TemporaryFileManager::ReadTemporaryBuffer(block_id_t id,
-                                                                 unique_ptr<FileBuffer> reusable_buffer) {
+unique_ptr<DBBuffer> TemporaryFileManager::ReadTemporaryBuffer(block_id_t id, unique_ptr<DBBuffer> reusable_buffer) {
 	TemporaryFileIndex index;
 	optional_ptr<TemporaryFileHandle> handle;
 	{

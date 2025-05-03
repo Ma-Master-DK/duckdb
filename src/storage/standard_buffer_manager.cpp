@@ -33,19 +33,19 @@ struct BufferAllocatorData : PrivateAllocatorData {
 	StandardBufferManager &manager;
 };
 
-unique_ptr<FileBuffer> StandardBufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
-                                                                     FileBufferType type) {
-	unique_ptr<FileBuffer> result;
-	if (type == FileBufferType::BLOCK) {
+unique_ptr<DBBuffer> StandardBufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<DBBuffer> &&source,
+                                                                   DBBufferType type) {
+	unique_ptr<DBBuffer> result;
+	if (type == DBBufferType::BLOCK) {
 		throw InternalException("ConstructManagedBuffer cannot be used to construct blocks");
 	}
 	if (source) {
 		auto tmp = std::move(source);
 		D_ASSERT(tmp->AllocSize() == BufferManager::GetAllocSize(size));
-		result = make_uniq<FileBuffer>(*tmp, type);
+		result = make_uniq<DBBuffer>(*tmp, type);
 	} else {
 		// no re-usable buffer: allocate a new buffer
-		result = make_uniq<FileBuffer>(Allocator::Get(db), type, size);
+		result = make_uniq<DBBuffer>(Allocator::Get(db), type, size);
 	}
 	result->Initialize(DBConfig::GetConfig(db).options.debug_initialize);
 	return result;
@@ -114,7 +114,7 @@ idx_t StandardBufferManager::GetBlockSize() const {
 
 template <typename... ARGS>
 TempBufferPoolReservation StandardBufferManager::EvictBlocksOrThrow(MemoryTag tag, idx_t memory_delta,
-                                                                    unique_ptr<FileBuffer> *buffer, ARGS... args) {
+                                                                    unique_ptr<DBBuffer> *buffer, ARGS... args) {
 	auto r = buffer_pool.EvictBlocks(tag, memory_delta, buffer_pool.maximum_memory, buffer);
 	if (!r.success) {
 		string extra_text = StringUtil::Format(" (%s/%s used)", StringUtil::BytesToHumanReadableString(GetUsedMemory()),
@@ -144,7 +144,7 @@ shared_ptr<BlockHandle> StandardBufferManager::RegisterSmallMemory(MemoryTag tag
 	auto reservation = EvictBlocksOrThrow(tag, size, nullptr, "could not allocate block of size %s%s",
 	                                      StringUtil::BytesToHumanReadableString(size));
 
-	auto buffer = ConstructManagedBuffer(size, nullptr, FileBufferType::TINY_BUFFER);
+	auto buffer = ConstructManagedBuffer(size, nullptr, DBBufferType::TINY_BUFFER);
 
 	// Create a new block pointer for this block.
 	auto result = make_shared_ptr<BlockHandle>(*temp_block_manager, ++temporary_id, tag, std::move(buffer),
@@ -160,7 +160,7 @@ shared_ptr<BlockHandle> StandardBufferManager::RegisterMemory(MemoryTag tag, idx
 	auto alloc_size = GetAllocSize(block_size);
 
 	// Evict blocks until there is enough memory to store the buffer.
-	unique_ptr<FileBuffer> reusable_buffer;
+	unique_ptr<DBBuffer> reusable_buffer;
 	auto res = EvictBlocksOrThrow(tag, alloc_size, &reusable_buffer, "could not allocate block of size %s%s",
 	                              StringUtil::BytesToHumanReadableString(alloc_size));
 
@@ -231,7 +231,7 @@ void StandardBufferManager::BatchRead(vector<shared_ptr<BlockHandle>> &handles, 
 	// allocate a buffer to hold the data of all of the blocks
 	auto intermediate_buffer = Allocate(MemoryTag::BASE_TABLE, block_count * block_manager.GetBlockSize());
 	// perform a batch read of the blocks into the buffer
-	block_manager.ReadBlocks(intermediate_buffer.GetFileBuffer(), first_block, block_count);
+	block_manager.ReadBlocks(intermediate_buffer.GetDBBuffer(), first_block, block_count);
 
 	// the blocks are read - now we need to assign them to the individual blocks
 	for (idx_t block_idx = 0; block_idx < block_count; block_idx++) {
@@ -242,7 +242,7 @@ void StandardBufferManager::BatchRead(vector<shared_ptr<BlockHandle>> &handles, 
 
 		// reserve memory for the block
 		idx_t required_memory = handle->GetMemoryUsage();
-		unique_ptr<FileBuffer> reusable_buffer;
+		unique_ptr<DBBuffer> reusable_buffer;
 		auto reservation = EvictBlocksOrThrow(handle->GetMemoryTag(), required_memory, &reusable_buffer,
 		                                      "failed to pin block of size %s%s",
 		                                      StringUtil::BytesToHumanReadableString(required_memory));
@@ -258,7 +258,7 @@ void StandardBufferManager::BatchRead(vector<shared_ptr<BlockHandle>> &handles, 
 				continue;
 			}
 			auto block_ptr =
-			    intermediate_buffer.GetFileBuffer().InternalBuffer() + block_idx * block_manager.GetBlockAllocSize();
+			    intermediate_buffer.GetDBBuffer().InternalBuffer() + block_idx * block_manager.GetBlockAllocSize();
 			buf = handle->LoadFromBuffer(lock, block_ptr, std::move(reusable_buffer), std::move(reservation));
 		}
 	}
@@ -325,7 +325,7 @@ BufferHandle StandardBufferManager::Pin(shared_ptr<BlockHandle> &handle) {
 		return buf; // the block was already loaded, return it without holding the BlockHandle's lock
 	} else {
 		// evict blocks until we have space for the current block
-		unique_ptr<FileBuffer> reusable_buffer;
+		unique_ptr<DBBuffer> reusable_buffer;
 		auto reservation = EvictBlocksOrThrow(handle->GetMemoryTag(), required_memory, &reusable_buffer,
 		                                      "failed to pin block of size %s%s",
 		                                      StringUtil::BytesToHumanReadableString(required_memory));
@@ -369,15 +369,15 @@ void StandardBufferManager::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) 
 
 void StandardBufferManager::VerifyZeroReaders(BlockLock &lock, shared_ptr<BlockHandle> &handle) {
 #ifdef DUCKDB_DEBUG_DESTROY_BLOCKS
-	unique_ptr<FileBuffer> replacement_buffer;
+	unique_ptr<DBBuffer> replacement_buffer;
 	auto &allocator = Allocator::Get(db);
 	auto alloc_size = handle->GetMemoryUsage() - Storage::DEFAULT_BLOCK_HEADER_SIZE;
 	auto &buffer = handle->GetBuffer(lock);
-	if (handle->GetBufferType() == FileBufferType::BLOCK) {
+	if (handle->GetBufferType() == DBBufferType::BLOCK) {
 		auto block = reinterpret_cast<Block *>(buffer.get());
 		replacement_buffer = make_uniq<Block>(allocator, block->id, alloc_size);
 	} else {
-		replacement_buffer = make_uniq<FileBuffer>(allocator, buffer->GetBufferType(), alloc_size);
+		replacement_buffer = make_uniq<DBBuffer>(allocator, buffer->GetBufferType(), alloc_size);
 	}
 	memcpy(replacement_buffer->buffer, buffer->buffer, buffer->size);
 	WriteGarbageIntoBuffer(lock, *handle);
@@ -389,7 +389,7 @@ void StandardBufferManager::Unpin(shared_ptr<BlockHandle> &handle) {
 	bool purge = false;
 	{
 		auto lock = handle->GetLock();
-		if (!handle->GetBuffer(lock) || handle->GetBufferType() == FileBufferType::TINY_BUFFER) {
+		if (!handle->GetBuffer(lock) || handle->GetBufferType() == DBBufferType::TINY_BUFFER) {
 			return;
 		}
 		D_ASSERT(handle->Readers() > 0);
@@ -435,10 +435,9 @@ vector<MemoryInformation> StandardBufferManager::GetMemoryUsageInfo() const {
 	return result;
 }
 
-unique_ptr<FileBuffer> StandardBufferManager::ReadTemporaryBufferInternal(BufferManager &buffer_manager,
-                                                                          FileHandle &handle, idx_t position,
-                                                                          idx_t size,
-                                                                          unique_ptr<FileBuffer> reusable_buffer) {
+unique_ptr<DBBuffer> StandardBufferManager::ReadTemporaryBufferInternal(BufferManager &buffer_manager, DBHandle &handle,
+                                                                        idx_t position, idx_t size,
+                                                                        unique_ptr<DBBuffer> reusable_buffer) {
 	auto buffer = buffer_manager.ConstructManagedBuffer(size, std::move(reusable_buffer));
 	buffer->Read(handle, position);
 	return buffer;
@@ -463,7 +462,7 @@ void StandardBufferManager::RequireTemporaryDirectory() {
 	}
 }
 
-void StandardBufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, FileBuffer &buffer) {
+void StandardBufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, DBBuffer &buffer) {
 
 	// WriteTemporaryBuffer assumes that we never write a buffer below DEFAULT_BLOCK_ALLOC_SIZE.
 	RequireTemporaryDirectory();
@@ -487,8 +486,8 @@ void StandardBufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block
 	buffer.Write(*handle, sizeof(idx_t));
 }
 
-unique_ptr<FileBuffer> StandardBufferManager::ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
-                                                                  unique_ptr<FileBuffer> reusable_buffer) {
+unique_ptr<DBBuffer> StandardBufferManager::ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
+                                                                unique_ptr<DBBuffer> reusable_buffer) {
 	D_ASSERT(!temporary_directory.path.empty());
 	D_ASSERT(temporary_directory.handle.get());
 	auto id = block.BlockId();

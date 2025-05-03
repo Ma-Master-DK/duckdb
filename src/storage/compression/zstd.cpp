@@ -473,7 +473,7 @@ public:
 
 		// Write the current page to disk
 		auto &block_manager = partial_block_manager.GetBlockManager();
-		block_manager.Write(buffer.GetFileBuffer(), block_id);
+		block_manager.Write(buffer.GetDBBuffer(), block_id);
 	}
 
 	void FlushVector() {

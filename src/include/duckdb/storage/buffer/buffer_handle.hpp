@@ -14,12 +14,12 @@
 
 namespace duckdb {
 class BlockHandle;
-class FileBuffer;
+class DBBuffer;
 
 class BufferHandle {
 public:
 	DUCKDB_API BufferHandle();
-	DUCKDB_API explicit BufferHandle(shared_ptr<BlockHandle> handle, optional_ptr<FileBuffer> node);
+	DUCKDB_API explicit BufferHandle(shared_ptr<BlockHandle> handle, optional_ptr<DBBuffer> node);
 	DUCKDB_API ~BufferHandle();
 	// disable copy constructors
 	BufferHandle(const BufferHandle &other) = delete;
@@ -42,7 +42,7 @@ public:
 		return node->buffer;
 	}
 	//! Gets the underlying file buffer. Handle must be valid.
-	DUCKDB_API FileBuffer &GetFileBuffer();
+	DUCKDB_API DBBuffer &GetDBBuffer();
 	//! Destroys the buffer handle
 	DUCKDB_API void Destroy();
 
@@ -54,7 +54,7 @@ private:
 	//! The block handle
 	shared_ptr<BlockHandle> handle;
 	//! The managed buffer node
-	optional_ptr<FileBuffer> node;
+	optional_ptr<DBBuffer> node;
 };
 
 } // namespace duckdb

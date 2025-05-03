@@ -41,6 +41,7 @@ struct Storage {
 	//! The size of the headers. This should be small and written more or less atomically by the hard disk. We default
 	//! to the page size, which is 4KB. (1 << 12)
 	constexpr static idx_t FILE_HEADER_SIZE = 4096U;
+	constexpr static idx_t NVME_HEADER_SIZE = 4096U;
 	//! The maximum row group size
 	constexpr static const idx_t MAX_ROW_GROUP_SIZE = 1ULL << 30ULL;
 

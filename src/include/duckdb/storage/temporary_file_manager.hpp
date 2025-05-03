@@ -133,8 +133,8 @@ public:
 	void EraseBlockIndex(block_id_t block_index);
 
 	//! Read/Write temporary buffers at given positions in this file (potentially compressed)
-	unique_ptr<FileBuffer> ReadTemporaryBuffer(idx_t block_index, unique_ptr<FileBuffer> reusable_buffer) const;
-	void WriteTemporaryBuffer(FileBuffer &buffer, idx_t block_index, AllocatedData &compressed_buffer) const;
+	unique_ptr<DBBuffer> ReadTemporaryBuffer(idx_t block_index, unique_ptr<DBBuffer> reusable_buffer) const;
+	void WriteTemporaryBuffer(DBBuffer &buffer, idx_t block_index, AllocatedData &compressed_buffer) const;
 
 	//! Deletes the file if there are no more blocks
 	bool DeleteIfEmpty();
@@ -271,9 +271,9 @@ public:
 	};
 
 	//! Create/Read/Update/Delete operations for temporary buffers
-	void WriteTemporaryBuffer(block_id_t block_id, FileBuffer &buffer);
+	void WriteTemporaryBuffer(block_id_t block_id, DBBuffer &buffer);
 	bool HasTemporaryBuffer(block_id_t block_id);
-	unique_ptr<FileBuffer> ReadTemporaryBuffer(block_id_t id, unique_ptr<FileBuffer> reusable_buffer);
+	unique_ptr<DBBuffer> ReadTemporaryBuffer(block_id_t id, unique_ptr<DBBuffer> reusable_buffer);
 	void DeleteTemporaryBuffer(block_id_t id);
 
 	//! Get the list of temporary files and their sizes
@@ -292,7 +292,7 @@ public:
 
 private:
 	//! Compress buffer, write it in compressed_buffer and return the size/level
-	CompressionResult CompressBuffer(TemporaryFileCompressionAdaptivity &compression_adaptivity, FileBuffer &buffer,
+	CompressionResult CompressBuffer(TemporaryFileCompressionAdaptivity &compression_adaptivity, DBBuffer &buffer,
 	                                 AllocatedData &compressed_buffer);
 
 	//! Create file name for given size/index

@@ -61,7 +61,7 @@ using BlockLock = unique_lock<mutex>;
 class BlockHandle : public enable_shared_from_this<BlockHandle> {
 public:
 	BlockHandle(BlockManager &block_manager, block_id_t block_id, MemoryTag tag);
-	BlockHandle(BlockManager &block_manager, block_id_t block_id, MemoryTag tag, unique_ptr<FileBuffer> buffer,
+	BlockHandle(BlockManager &block_manager, block_id_t block_id, MemoryTag tag, unique_ptr<DBBuffer> buffer,
 	            DestroyBufferUpon destroy_buffer_upon, idx_t block_size, BufferPoolReservation &&reservation);
 	~BlockHandle();
 
@@ -123,7 +123,7 @@ public:
 		// can only be set once
 		D_ASSERT(eviction_queue_idx == DConstants::INVALID_INDEX);
 		// MANAGED_BUFFER only (at least, for now)
-		D_ASSERT(GetBufferType() == FileBufferType::MANAGED_BUFFER);
+		D_ASSERT(GetBufferType() == DBBufferType::MANAGED_BUFFER);
 		eviction_queue_idx = index;
 	}
 
@@ -131,7 +131,7 @@ public:
 		return eviction_queue_idx;
 	}
 
-	FileBufferType GetBufferType() const {
+	DBBufferType GetBufferType() const {
 		return buffer_type;
 	}
 
@@ -152,7 +152,7 @@ public:
 	}
 
 	//! Gets a reference to the buffer - the lock must be held
-	unique_ptr<FileBuffer> &GetBuffer(BlockLock &l);
+	unique_ptr<DBBuffer> &GetBuffer(BlockLock &l);
 
 	void ChangeMemoryUsage(BlockLock &l, int64_t delta);
 	BufferPoolReservation &GetMemoryCharge(BlockLock &l);
@@ -163,10 +163,10 @@ public:
 
 	//! Resize the actual buffer
 	void ResizeBuffer(BlockLock &, idx_t block_size, int64_t memory_delta);
-	BufferHandle Load(unique_ptr<FileBuffer> buffer = nullptr);
-	BufferHandle LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_ptr<FileBuffer> reusable_buffer,
+	BufferHandle Load(unique_ptr<DBBuffer> buffer = nullptr);
+	BufferHandle LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_ptr<DBBuffer> reusable_buffer,
 	                            BufferPoolReservation reservation);
-	unique_ptr<FileBuffer> UnloadAndTakeBlock(BlockLock &);
+	unique_ptr<DBBuffer> UnloadAndTakeBlock(BlockLock &);
 	void Unload(BlockLock &);
 
 	//! Returns whether or not the block can be unloaded
@@ -174,7 +174,7 @@ public:
 	//! lock is not held
 	bool CanUnload() const;
 
-	void ConvertToPersistent(BlockLock &, BlockHandle &new_block, unique_ptr<FileBuffer> new_buffer);
+	void ConvertToPersistent(BlockLock &, BlockHandle &new_block, unique_ptr<DBBuffer> new_buffer);
 
 private:
 	void VerifyMutex(unique_lock<mutex> &l) const;
@@ -191,9 +191,9 @@ private:
 	//! Memory tag
 	const MemoryTag tag;
 	//! File buffer type
-	const FileBufferType buffer_type;
+	const DBBufferType buffer_type;
 	//! Pointer to loaded data (if any)
-	unique_ptr<FileBuffer> buffer;
+	unique_ptr<DBBuffer> buffer;
 	//! Internal eviction sequence number
 	atomic<idx_t> eviction_seq_num;
 	//! LRU timestamp (for age-based eviction)
@@ -207,7 +207,7 @@ private:
 	BufferPoolReservation memory_charge;
 	//! Does the block contain any memory pointers?
 	const char *unswizzled;
-	//! Index for eviction queue (FileBufferType::MANAGED_BUFFER only, for now)
+	//! Index for eviction queue (DBBufferType::MANAGED_BUFFER only, for now)
 	atomic<idx_t> eviction_queue_idx;
 };
 

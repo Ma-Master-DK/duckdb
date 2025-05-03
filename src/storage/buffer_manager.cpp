@@ -69,8 +69,7 @@ idx_t BufferManager::GetQueryMaxMemory() const {
 	return GetBufferPool().GetQueryMaxMemory();
 }
 
-unique_ptr<FileBuffer> BufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&,
-                                                             FileBufferType type) {
+unique_ptr<DBBuffer> BufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<DBBuffer> &&, DBBufferType type) {
 	throw NotImplementedException("This type of BufferManager can not construct managed buffers");
 }
 
@@ -80,12 +79,12 @@ void BufferManager::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) {
 	throw NotImplementedException("This type of BufferManager does not support 'AddToEvictionQueue");
 }
 
-void BufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, FileBuffer &buffer) {
+void BufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, DBBuffer &buffer) {
 	throw NotImplementedException("This type of BufferManager does not support 'WriteTemporaryBuffer");
 }
 
-unique_ptr<FileBuffer> BufferManager::ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
-                                                          unique_ptr<FileBuffer> buffer) {
+unique_ptr<DBBuffer> BufferManager::ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
+                                                        unique_ptr<DBBuffer> buffer) {
 	throw NotImplementedException("This type of BufferManager does not support 'ReadTemporaryBuffer");
 }
 
