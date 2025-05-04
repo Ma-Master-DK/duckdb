@@ -10,10 +10,11 @@ add_library_unity(
   duckdb_storage
   OBJECT
   arena_allocator.cpp
+  block.cpp
   buffer_manager.cpp
   checkpoint_manager.cpp
   temporary_memory_manager.cpp
-  block.cpp
+  file_block.cpp
   data_pointer.cpp
   data_table.cpp
   index.cpp

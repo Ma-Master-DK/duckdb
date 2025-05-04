@@ -20,10 +20,10 @@ public:
 	using BlockManager::BlockManager;
 
 	// LCOV_EXCL_START
-	unique_ptr<Block> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override {
+	unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override {
 		throw InternalException("Cannot perform IO in in-memory database - ConvertBlock!");
 	}
-	unique_ptr<Block> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override {
+	unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override {
 		throw InternalException("Cannot perform IO in in-memory database - CreateBlock!");
 	}
 	block_id_t GetFreeBlockId() override {
@@ -50,7 +50,7 @@ public:
 	idx_t GetMetaBlock() override {
 		throw InternalException("Cannot perform IO in in-memory database - GetMetaBlock!");
 	}
-	void Read(Block &block) override {
+	void Read(FileBlock &block) override {
 		throw InternalException("Cannot perform IO in in-memory database - Read!");
 	}
 	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override {

@@ -17,7 +17,7 @@
 #include "duckdb/common/serializer/buffered_file_writer.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/main/attached_database.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
 #include "duckdb/storage/storage_info.hpp"
 
 namespace duckdb {

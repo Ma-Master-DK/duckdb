@@ -10,7 +10,7 @@
 
 #include "duckdb/common/common.hpp"
 #include "duckdb/storage/block_manager.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/common/set.hpp"
@@ -47,8 +47,8 @@ public:
 	void LoadExistingDatabase();
 
 	//! Creates a new Block using the specified block_id and returns a pointer
-	unique_ptr<Block> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
-	unique_ptr<Block> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
+	unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
+	unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
 	//! Return the next free block id
 	block_id_t GetFreeBlockId() override;
 	//! Check the next free block id - but do not assign or allocate it
@@ -66,7 +66,7 @@ public:
 	//! Return the meta block id
 	idx_t GetMetaBlock() override;
 	//! Read the content of the block from disk
-	void Read(Block &block) override;
+	void Read(FileBlock &block) override;
 	//! Read the content of a range of blocks into a buffer
 	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override;
 	//! Write the given block to disk

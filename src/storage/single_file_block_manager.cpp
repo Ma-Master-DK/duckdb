@@ -553,17 +553,17 @@ bool SingleFileBlockManager::IsRemote() {
 	return !handle->OnDiskFile();
 }
 
-unique_ptr<Block> SingleFileBlockManager::ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) {
+unique_ptr<FileBlock> SingleFileBlockManager::ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) {
 	D_ASSERT(source_buffer.AllocSize() == GetBlockAllocSize());
-	return make_uniq<Block>(source_buffer, block_id);
+	return make_uniq<FileBlock>(source_buffer, block_id);
 }
 
-unique_ptr<Block> SingleFileBlockManager::CreateBlock(block_id_t block_id, FileBuffer *source_buffer) {
-	unique_ptr<Block> result;
+unique_ptr<FileBlock> SingleFileBlockManager::CreateBlock(block_id_t block_id, FileBuffer *source_buffer) {
+	unique_ptr<FileBlock> result;
 	if (source_buffer) {
 		result = ConvertBlock(block_id, *source_buffer);
 	} else {
-		result = make_uniq<Block>(Allocator::Get(db), block_id, GetBlockSize());
+		result = make_uniq<FileBlock>(Allocator::Get(db), block_id, GetBlockSize());
 	}
 	result->Initialize(options.debug_initialize);
 	return result;
@@ -573,7 +573,7 @@ idx_t SingleFileBlockManager::GetBlockLocation(block_id_t block_id) {
 	return BLOCK_START + NumericCast<idx_t>(block_id) * GetBlockAllocSize();
 }
 
-void SingleFileBlockManager::Read(Block &block) {
+void SingleFileBlockManager::Read(FileBlock &block) {
 	D_ASSERT(block.id >= 0);
 	D_ASSERT(std::find(free_list.begin(), free_list.end(), block.id) == free_list.end());
 	ReadAndChecksum(block, GetBlockLocation(block.id));

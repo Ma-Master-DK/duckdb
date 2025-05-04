@@ -10,7 +10,7 @@
 
 #include "duckdb/common/types/value.hpp"
 #include "duckdb/common/unordered_map.hpp"
-#include "duckdb/storage/block.hpp"
+#include "duckdb/storage/file_block.hpp"
 #include "duckdb/storage/index_storage_info.hpp"
 #include "duckdb/storage/storage_info.hpp"
 #include "duckdb/common/optional_idx.hpp"
