@@ -6,26 +6,19 @@
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/storage/storage_info.hpp"
+#include "duckdb/common/db_buffer.hpp"
 #include <cstring>
 
 namespace duckdb {
 
-FileBuffer::FileBuffer(Allocator &allocator, FileBufferType type, uint64_t user_size)
-    : allocator(allocator), type(type) {
+FileBuffer::FileBuffer(Allocator &allocator, DBBufferType type, uint64_t user_size) : DBBuffer(type), allocator(allocator) {
 	Init();
 	if (user_size) {
 		Resize(user_size);
 	}
 }
 
-void FileBuffer::Init() {
-	buffer = nullptr;
-	size = 0;
-	internal_buffer = nullptr;
-	internal_size = 0;
-}
-
-FileBuffer::FileBuffer(FileBuffer &source, FileBufferType type_p) : allocator(source.allocator), type(type_p) {
+FileBuffer::FileBuffer(FileBuffer &source, DBBufferType type_p) : DBBuffer(type), allocator(source.allocator) {
 	// take over the structures of the source buffer
 	buffer = source.buffer;
 	size = source.size;
@@ -40,6 +33,13 @@ FileBuffer::~FileBuffer() {
 		return;
 	}
 	allocator.FreeData(internal_buffer, internal_size);
+}
+
+void FileBuffer::Init() {
+	buffer = nullptr;
+	size = 0;
+	internal_buffer = nullptr;
+	internal_size = 0;
 }
 
 void FileBuffer::ReallocBuffer(idx_t new_size) {
@@ -62,37 +62,13 @@ void FileBuffer::ReallocBuffer(idx_t new_size) {
 	size = 0;
 }
 
-FileBuffer::MemoryRequirement FileBuffer::CalculateMemory(uint64_t user_size) {
-	FileBuffer::MemoryRequirement result;
-
-	if (type == FileBufferType::TINY_BUFFER) {
-		// We never do IO on tiny buffers, so there's no need to add a header or sector-align.
-		result.header_size = 0;
-		result.alloc_size = user_size;
-	} else {
-		result.header_size = Storage::DEFAULT_BLOCK_HEADER_SIZE;
-		result.alloc_size = AlignValue<idx_t, Storage::SECTOR_SIZE>(result.header_size + user_size);
-	}
-	return result;
-}
-
-void FileBuffer::Resize(uint64_t new_size) {
-	auto req = CalculateMemory(new_size);
-	ReallocBuffer(req.alloc_size);
-
-	if (new_size > 0) {
-		buffer = internal_buffer + req.header_size;
-		size = internal_size - req.header_size;
-	}
-}
-
 void FileBuffer::Read(FileHandle &handle, uint64_t location) {
-	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+	D_ASSERT(type != DBBufferType::TINY_BUFFER);
 	handle.Read(internal_buffer, internal_size, location);
 }
 
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
-	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+	D_ASSERT(type != DBBufferType::TINY_BUFFER);
 	handle.Write(internal_buffer, internal_size, location);
 }
 
@@ -109,3 +85,4 @@ void FileBuffer::Initialize(DebugInitialize initialize) {
 }
 
 } // namespace duckdb
+

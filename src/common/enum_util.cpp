@@ -1622,23 +1622,23 @@ ExtraTypeInfoType EnumUtil::FromString<ExtraTypeInfoType>(const char *value) {
 	return static_cast<ExtraTypeInfoType>(StringUtil::StringToEnum(GetExtraTypeInfoTypeValues(), 12, "ExtraTypeInfoType", value));
 }
 
-const StringUtil::EnumStringLiteral *GetFileBufferTypeValues() {
+const StringUtil::EnumStringLiteral *GetDBBufferTypeValues() {
 	static constexpr StringUtil::EnumStringLiteral values[] {
-		{ static_cast<uint32_t>(FileBufferType::BLOCK), "BLOCK" },
-		{ static_cast<uint32_t>(FileBufferType::MANAGED_BUFFER), "MANAGED_BUFFER" },
-		{ static_cast<uint32_t>(FileBufferType::TINY_BUFFER), "TINY_BUFFER" }
+		{ static_cast<uint32_t>(DBBufferType::BLOCK), "BLOCK" },
+		{ static_cast<uint32_t>(DBBufferType::MANAGED_BUFFER), "MANAGED_BUFFER" },
+		{ static_cast<uint32_t>(DBBufferType::TINY_BUFFER), "TINY_BUFFER" }
 	};
 	return values;
 }
 
 template<>
-const char* EnumUtil::ToChars<FileBufferType>(FileBufferType value) {
-	return StringUtil::EnumToString(GetFileBufferTypeValues(), 3, "FileBufferType", static_cast<uint32_t>(value));
+const char* EnumUtil::ToChars<DBBufferType>(DBBufferType value) {
+	return StringUtil::EnumToString(GetDBBufferTypeValues(), 3, "DBBufferType", static_cast<uint32_t>(value));
 }
 
 template<>
-FileBufferType EnumUtil::FromString<FileBufferType>(const char *value) {
-	return static_cast<FileBufferType>(StringUtil::StringToEnum(GetFileBufferTypeValues(), 3, "FileBufferType", value));
+DBBufferType EnumUtil::FromString<DBBufferType>(const char *value) {
+	return static_cast<DBBufferType>(StringUtil::StringToEnum(GetDBBufferTypeValues(), 3, "DBBufferType", value));
 }
 
 const StringUtil::EnumStringLiteral *GetFileCompressionTypeValues() {

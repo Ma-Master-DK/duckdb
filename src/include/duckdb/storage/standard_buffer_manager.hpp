@@ -96,7 +96,7 @@ public:
 
 	//! Construct a managed buffer.
 	unique_ptr<FileBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
-	                                              FileBufferType type = FileBufferType::MANAGED_BUFFER) override;
+	                                              DBBufferType type = DBBufferType::MANAGED_BUFFER) override;
 
 	DUCKDB_API void ReserveMemory(idx_t size) final;
 	DUCKDB_API void FreeReservedMemory(idx_t size) final;

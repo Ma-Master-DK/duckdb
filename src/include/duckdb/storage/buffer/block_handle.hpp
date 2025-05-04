@@ -122,7 +122,7 @@ public:
 		// can only be set once
 		D_ASSERT(eviction_queue_idx == DConstants::INVALID_INDEX);
 		// MANAGED_BUFFER only (at least, for now)
-		D_ASSERT(GetBufferType() == FileBufferType::MANAGED_BUFFER);
+		D_ASSERT(GetBufferType() == DBBufferType::MANAGED_BUFFER);
 		eviction_queue_idx = index;
 	}
 
@@ -130,7 +130,7 @@ public:
 		return eviction_queue_idx;
 	}
 
-	FileBufferType GetBufferType() const {
+	DBBufferType GetBufferType() const {
 		return buffer_type;
 	}
 
@@ -190,7 +190,7 @@ private:
 	//! Memory tag
 	const MemoryTag tag;
 	//! File buffer type
-	const FileBufferType buffer_type;
+	const DBBufferType buffer_type;
 	//! Pointer to loaded data (if any)
 	unique_ptr<FileBuffer> buffer;
 	//! Internal eviction sequence number
@@ -206,7 +206,7 @@ private:
 	BufferPoolReservation memory_charge;
 	//! Does the block contain any memory pointers?
 	const char *unswizzled;
-	//! Index for eviction queue (FileBufferType::MANAGED_BUFFER only, for now)
+	//! Index for eviction queue (DBBufferType::MANAGED_BUFFER only, for now)
 	atomic<idx_t> eviction_queue_idx;
 };
 

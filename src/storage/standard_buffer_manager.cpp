@@ -34,9 +34,9 @@ struct BufferAllocatorData : PrivateAllocatorData {
 };
 
 unique_ptr<FileBuffer> StandardBufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
-                                                                     FileBufferType type) {
+                                                                     DBBufferType type) {
 	unique_ptr<FileBuffer> result;
-	if (type == FileBufferType::BLOCK) {
+	if (type == DBBufferType::BLOCK) {
 		throw InternalException("ConstructManagedBuffer cannot be used to construct blocks");
 	}
 	if (source) {
@@ -144,7 +144,7 @@ shared_ptr<BlockHandle> StandardBufferManager::RegisterSmallMemory(MemoryTag tag
 	auto reservation = EvictBlocksOrThrow(tag, size, nullptr, "could not allocate block of size %s%s",
 	                                      StringUtil::BytesToHumanReadableString(size));
 
-	auto buffer = ConstructManagedBuffer(size, nullptr, FileBufferType::TINY_BUFFER);
+	auto buffer = ConstructManagedBuffer(size, nullptr, DBBufferType::TINY_BUFFER);
 
 	// Create a new block pointer for this block.
 	auto result = make_shared_ptr<BlockHandle>(*temp_block_manager, ++temporary_id, tag, std::move(buffer),
@@ -373,7 +373,7 @@ void StandardBufferManager::VerifyZeroReaders(BlockLock &lock, shared_ptr<BlockH
 	auto &allocator = Allocator::Get(db);
 	auto alloc_size = handle->GetMemoryUsage() - Storage::DEFAULT_BLOCK_HEADER_SIZE;
 	auto &buffer = handle->GetBuffer(lock);
-	if (handle->GetBufferType() == FileBufferType::BLOCK) {
+	if (handle->GetBufferType() == DBBufferType::BLOCK) {
 		auto block = reinterpret_cast<Block *>(buffer.get());
 		replacement_buffer = make_uniq<Block>(allocator, block->id, alloc_size);
 	} else {
@@ -389,7 +389,7 @@ void StandardBufferManager::Unpin(shared_ptr<BlockHandle> &handle) {
 	bool purge = false;
 	{
 		auto lock = handle->GetLock();
-		if (!handle->GetBuffer(lock) || handle->GetBufferType() == FileBufferType::TINY_BUFFER) {
+		if (!handle->GetBuffer(lock) || handle->GetBufferType() == DBBufferType::TINY_BUFFER) {
 			return;
 		}
 		D_ASSERT(handle->Readers() > 0);

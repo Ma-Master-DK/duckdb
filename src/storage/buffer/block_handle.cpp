@@ -10,7 +10,7 @@
 namespace duckdb {
 
 BlockHandle::BlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag)
-    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(FileBufferType::BLOCK),
+    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(DBBufferType::BLOCK),
       buffer(nullptr), eviction_seq_num(0), destroy_buffer_upon(DestroyBufferUpon::BLOCK),
       memory_charge(tag, block_manager.buffer_manager.GetBufferPool()), unswizzled(nullptr),
       eviction_queue_idx(DConstants::INVALID_INDEX) {
@@ -36,7 +36,7 @@ BlockHandle::~BlockHandle() { // NOLINT: allow internal exceptions
 	// being destroyed, so any unswizzled pointers are just binary junk now.
 	unswizzled = nullptr;
 	D_ASSERT(!buffer || buffer->GetBufferType() == buffer_type);
-	if (buffer && buffer_type != FileBufferType::TINY_BUFFER) {
+	if (buffer && buffer_type != DBBufferType::TINY_BUFFER) {
 		// we kill the latest version in the eviction queue
 		auto &buffer_manager = block_manager.buffer_manager;
 		buffer_manager.GetBufferPool().IncrementDeadNodes(*this);
@@ -61,7 +61,7 @@ unique_ptr<Block> AllocateBlock(BlockManager &block_manager, unique_ptr<FileBuff
                                 block_id_t block_id) {
 	if (reusable_buffer) {
 		// re-usable buffer: re-use it
-		if (reusable_buffer->GetBufferType() == FileBufferType::BLOCK) {
+		if (reusable_buffer->GetBufferType() == DBBufferType::BLOCK) {
 			// we can reuse the buffer entirely
 			auto &block = reinterpret_cast<Block &>(*reusable_buffer);
 			block.id = block_id;

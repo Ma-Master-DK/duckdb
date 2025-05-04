@@ -41,7 +41,7 @@ typedef duckdb_moodycamel::ConcurrentQueue<BufferEvictionNode> eviction_queue_t;
 
 struct EvictionQueue {
 public:
-	explicit EvictionQueue(const FileBufferType file_buffer_type_p)
+	explicit EvictionQueue(const DBBufferType file_buffer_type_p)
 	    : file_buffer_type(file_buffer_type_p), evict_queue_insertions(0), total_dead_nodes(0) {
 	}
 
@@ -71,7 +71,7 @@ private:
 
 public:
 	//! The type of the buffers in this queue
-	const FileBufferType file_buffer_type;
+	const DBBufferType file_buffer_type;
 	//! The concurrent queue
 	eviction_queue_t q;
 
@@ -204,8 +204,8 @@ BufferPool::BufferPool(idx_t maximum_memory, bool track_eviction_timestamps,
       allocator_bulk_deallocation_flush_threshold(allocator_bulk_deallocation_flush_threshold),
       track_eviction_timestamps(track_eviction_timestamps),
       temporary_memory_manager(make_uniq<TemporaryMemoryManager>()) {
-	for (uint8_t type_idx = 0; type_idx < FILE_BUFFER_TYPE_COUNT; type_idx++) {
-		const auto type = static_cast<FileBufferType>(type_idx + 1);
+	for (uint8_t type_idx = 0; type_idx < DB_BUFFER_TYPE_COUNT; type_idx++) {
+		const auto type = static_cast<DBBufferType>(type_idx + 1);
 		const auto &type_queue_size = eviction_queue_sizes[type_idx];
 		for (idx_t queue_idx = 0; queue_idx < type_queue_size; queue_idx++) {
 			queues.push_back(make_uniq<EvictionQueue>(type));
@@ -241,10 +241,10 @@ bool BufferPool::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) {
 EvictionQueue &BufferPool::GetEvictionQueueForBlockHandle(const BlockHandle &handle) {
 	const auto &handle_buffer_type = handle.GetBufferType();
 
-	// Get offset into eviction queues for this FileBufferType
+	// Get offset into eviction queues for this DBBufferType
 	idx_t queue_index = 0;
-	for (uint8_t type_idx = 0; type_idx < FILE_BUFFER_TYPE_COUNT; type_idx++) {
-		const auto queue_buffer_type = static_cast<FileBufferType>(type_idx + 1);
+	for (uint8_t type_idx = 0; type_idx < DB_BUFFER_TYPE_COUNT; type_idx++) {
+		const auto queue_buffer_type = static_cast<DBBufferType>(type_idx + 1);
 		if (handle_buffer_type == queue_buffer_type) {
 			break;
 		}
