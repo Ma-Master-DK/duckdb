@@ -43,6 +43,7 @@ add_library_unity(
   exception_format_value.cpp
   extra_type_info.cpp
   file_buffer.cpp
+  nvme_buffer.cpp
   file_system.cpp
   filename_pattern.cpp
   fsst.cpp
