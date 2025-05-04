@@ -11,14 +11,15 @@
 
 namespace duckdb {
 
-FileBuffer::FileBuffer(Allocator &allocator, DBBufferType type, uint64_t user_size) : DBBuffer(type), allocator(allocator) {
+FileBuffer::FileBuffer(Allocator &allocator, DBBufferType type, uint64_t user_size)
+    : DBBuffer(type), allocator(allocator) {
 	Init();
 	if (user_size) {
 		Resize(user_size);
 	}
 }
 
-FileBuffer::FileBuffer(FileBuffer &source, DBBufferType type_p) : DBBuffer(type), allocator(source.allocator) {
+FileBuffer::FileBuffer(FileBuffer &source, DBBufferType type) : DBBuffer(type), allocator(source.allocator) {
 	// take over the structures of the source buffer
 	buffer = source.buffer;
 	size = source.size;
@@ -85,4 +86,3 @@ void FileBuffer::Initialize(DebugInitialize initialize) {
 }
 
 } // namespace duckdb
-
