@@ -17,6 +17,7 @@ namespace duckdb {
 
 class NvmeBlock : public Block, public NvmeBuffer {
 public:
+	NvmeBlock(block_id_t id);
 	NvmeBlock(NvmeBuffer &source, block_id_t id);
 };
 

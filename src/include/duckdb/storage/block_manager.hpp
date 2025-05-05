@@ -12,6 +12,7 @@
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/common/optional_idx.hpp"
 #include "duckdb/storage/file_block.hpp"
+#include "duckdb/storage/nvme_block.hpp"
 #include "duckdb/storage/storage_info.hpp"
 #include "duckdb/common/unordered_map.hpp"
 
@@ -37,7 +38,10 @@ public:
 public:
 	//! Creates a new block inside the block manager
 	virtual unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) = 0;
+	virtual unique_ptr<NvmeBlock> ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) = 0;
+
 	virtual unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) = 0;
+	virtual unique_ptr<NvmeBlock> CreateBlock(block_id_t block_id, NvmeBuffer *source_buffer) = 0;
 
 	//! Return the next free block id
 	virtual block_id_t GetFreeBlockId() = 0;
@@ -65,15 +69,21 @@ public:
 
 	//! Read the content of the block from disk
 	virtual void Read(FileBlock &block) = 0;
+	virtual void Read(NvmeBlock &block) = 0;
 
 	//! Read the content of the block from disk
 	virtual void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) = 0;
+	virtual void ReadBlocks(NvmeBuffer &buffer, block_id_t start_block, idx_t block_count) = 0;
 
 	//! Writes the block to disk
 	virtual void Write(FileBuffer &block, block_id_t block_id) = 0;
+	virtual void Write(NvmeBuffer &block, block_id_t block_id) = 0;
 
 	//! Writes the block to disk
 	void Write(FileBlock &block) {
+		Write(block, block.id);
+	}
+	void Write(NvmeBlock &block) {
 		Write(block, block.id);
 	}
 

@@ -72,7 +72,26 @@ unique_ptr<FileBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<File
 		return block;
 	} else {
 		// no re-usable buffer: allocate a new block
-		return block_manager.CreateBlock(block_id, nullptr);
+		return block_manager.CreateBlock(block_id, static_cast<FileBuffer *>(nullptr));
+	}
+}
+
+unique_ptr<NvmeBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<NvmeBuffer> reusable_buffer,
+                                    block_id_t block_id) {
+	if (reusable_buffer) {
+		// re-usable buffer: re-use it
+		if (reusable_buffer->GetBufferType() == DBBufferType::BLOCK) {
+			// we can reuse the buffer entirely
+			auto &block = reinterpret_cast<NvmeBlock &>(*reusable_buffer);
+			block.id = block_id;
+			return unique_ptr_cast<NvmeBuffer, NvmeBlock>(std::move(reusable_buffer));
+		}
+		auto block = block_manager.CreateBlock(block_id, reusable_buffer.get());
+		reusable_buffer.reset();
+		return block;
+	} else {
+		// no re-usable buffer: allocate a new block
+		return block_manager.CreateBlock(block_id, static_cast<NvmeBuffer *>(nullptr));
 	}
 }
 

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "duckdb/common/common.hpp"
+#include "duckdb/common/exception.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/storage/file_block.hpp"
 #include "duckdb/common/file_system.hpp"
@@ -29,22 +30,40 @@ class SingleFileBlockManager : public SingleDbBlockManager {
 public:
 	SingleFileBlockManager(AttachedDatabase &db, const string &path, const StorageManagerOptions &options);
 
+	~SingleFileBlockManager() override;
+
 public:
 	void CreateNewDatabase() override;
 	void LoadExistingDatabase() override;
 
 	//! Creates a new Block using the specified block_id and returns a pointer
 	unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override;
+	unique_ptr<NvmeBlock> ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) override {
+		throw IOException("NvmeBuffer not allowed for SingleFileBlockManager.");
+	}
+
 	unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override;
+	unique_ptr<NvmeBlock> CreateBlock(block_id_t block_id, NvmeBuffer *source_buffer) override {
+		throw IOException("NvmeBuffer not allowed for SingleFileBlockManager.");
+	}
 
 	//! Read the content of the block from disk
 	void Read(FileBlock &block) override;
+	void Read(NvmeBlock &block) override {
+		throw IOException("NvmeBlock not allowed for SingleFileBlockManager.");
+	}
 
 	//! Read the content of a range of blocks into a buffer
 	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override;
+	void ReadBlocks(NvmeBuffer &buffer, block_id_t start_block, idx_t block_count) override {
+		throw IOException("NvmeBuffer not allowed for SingleFileBlockManager.");
+	}
 
 	//! Write the given block to disk
 	void Write(FileBuffer &block, block_id_t block_id) override;
+	void Write(NvmeBuffer &block, block_id_t block_id) override {
+		throw IOException("NvmeBuffer not allowed for SingleFileBlockManager.");
+	}
 
 	//! Write the header to disk, this is the final step of the checkpointing process
 	void WriteHeader(DatabaseHeader header) override;

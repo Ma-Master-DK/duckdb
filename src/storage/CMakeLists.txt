@@ -30,6 +30,7 @@ add_library_unity(
   partial_block_manager.cpp
   single_db_block_manager.cpp
   single_file_block_manager.cpp
+  single_nvme_block_manager.cpp
   storage_info.cpp
   storage_lock.cpp
   wal_replay.cpp)

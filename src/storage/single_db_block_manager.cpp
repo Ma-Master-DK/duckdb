@@ -127,6 +127,9 @@ SingleDbBlockManager::SingleDbBlockManager(AttachedDatabase &db, const string &p
       iteration_count(0), options(options) {
 }
 
+SingleDbBlockManager::~SingleDbBlockManager() {
+}
+
 FileOpenFlags SingleDbBlockManager::GetFileFlags(bool create_new) const {
 	FileOpenFlags result;
 	if (options.read_only) {
@@ -415,24 +418,5 @@ vector<MetadataHandle> SingleDbBlockManager::GetFreeListBlocks() {
 
 	return free_list_blocks;
 }
-
-class FreeListBlockWriter : public MetadataWriter {
-public:
-	FreeListBlockWriter(MetadataManager &manager, vector<MetadataHandle> free_list_blocks_p)
-	    : MetadataWriter(manager), free_list_blocks(std::move(free_list_blocks_p)), index(0) {
-	}
-
-	vector<MetadataHandle> free_list_blocks;
-	idx_t index;
-
-protected:
-	MetadataHandle NextHandle() override {
-		if (index >= free_list_blocks.size()) {
-			throw InternalException(
-			    "Free List Block Writer ran out of blocks, this means not enough blocks were allocated up front");
-		}
-		return std::move(free_list_blocks[index++]);
-	}
-};
 
 } // namespace duckdb

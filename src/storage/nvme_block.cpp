@@ -2,8 +2,13 @@
 
 #include "duckdb/common/assert.hpp"
 #include "duckdb/common/db_buffer.hpp"
+#include "duckdb/common/nvme_buffer.hpp"
+#include "duckdb/storage/storage_info.hpp"
 
 namespace duckdb {
+
+NvmeBlock::NvmeBlock(block_id_t id) : Block(id), NvmeBuffer(DBBufferType::BLOCK) {
+}
 
 NvmeBlock::NvmeBlock(NvmeBuffer &source, block_id_t id) : Block(id), NvmeBuffer(source, DBBufferType::BLOCK) {
 	// TODOTODO: can we do this with xnvme?

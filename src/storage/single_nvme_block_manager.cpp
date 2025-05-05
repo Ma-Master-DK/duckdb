@@ -1,6 +1,5 @@
-#include "duckdb/storage/single_file_block_manager.hpp"
+#include "duckdb/storage/single_nvme_block_manager.hpp"
 
-#include "duckdb/common/allocator.hpp"
 #include "duckdb/common/assert.hpp"
 #include "duckdb/common/checksum.hpp"
 #include "duckdb/common/exception.hpp"
@@ -12,71 +11,90 @@
 #include "duckdb/storage/metadata/metadata_reader.hpp"
 #include "duckdb/storage/metadata/metadata_writer.hpp"
 #include "duckdb/storage/single_db_block_manager.hpp"
+#include "duckdb/storage/storage_info.hpp"
 #include "duckdb/storage/storage_manager.hpp"
+#include "miniz.hpp"
 
 #include <algorithm>
 #include <cstring>
+#include <libxnvme.h>
+#include <libxnvme_nvm.h>
 
 namespace duckdb {
 
-void MainHeader::CheckMagicBytes(FileHandle &handle) {
+void MainHeader::CheckMagicBytes(xnvme_dev *dev) {
 	data_t magic_bytes[MAGIC_BYTE_SIZE];
-	if (handle.GetFileSize() < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+	if (xnvme_dev_get_geo(dev)->tbytes < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
+		xnvme_cli_perr("The device exists, but is not a valid DuckDB db file.", errno);
+		return;
 	}
-	handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
+
+	// handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
+
+	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), MainHeader::MAGIC_BYTE_OFFSET, 1, magic_bytes, nullptr);
+
 	if (memcmp(magic_bytes, MainHeader::MAGIC_BYTES, MainHeader::MAGIC_BYTE_SIZE) != 0) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+		xnvme_cli_perr("The device exists, but is not a valid DuckDB db file.", errno);
+		return;
 	}
 }
 
-SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const string &path,
+SingleNvmeBlockManager::SingleNvmeBlockManager(AttachedDatabase &db, const string &path,
                                                const StorageManagerOptions &options)
-    : SingleDbBlockManager(db, path, options),
-      header_buffer(Allocator::Get(db), DBBufferType::MANAGED_BUFFER,
-                    Storage::FILE_HEADER_SIZE - Storage::DEFAULT_BLOCK_HEADER_SIZE) {
+    : SingleDbBlockManager(db, path, options), dev_buffer(DBBufferType::MANAGED_BUFFER) {
 }
 
-SingleFileBlockManager::~SingleFileBlockManager() {
-	handle->Close();
+SingleNvmeBlockManager::~SingleNvmeBlockManager() {
+	xnvme_dev_close(dev);
 }
 
-void SingleFileBlockManager::CreateNewDatabase() {
-	auto flags = GetFileFlags(true);
+void SingleNvmeBlockManager::CreateNewDatabase() {
+	struct xnvme_opts opts = xnvme_opts_default();
+	dev = xnvme_dev_open(path.c_str(), &opts);
+	if (!dev) {
+		xnvme_cli_perr("xnvme_dev_open()", errno);
+		return;
+	}
 
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
+	size_t buf_size = xnvme_dev_get_geo(dev)->lba_nbytes;
+	char *buf = static_cast<char *>(xnvme_buf_alloc(dev, buf_size));
+	if (!buf) {
+		xnvme_cli_perr("xnvme_buf_alloc()", errno);
+		xnvme_dev_close(dev);
+		return;
+	}
 
-	// if we create a new file, we fill the metadata of the file
-	// first fill in the new header
-	header_buffer.Clear();
+	dev_buffer.Init(dev);
+	dev_buffer.Clear();
 
 	options.version_number = GetVersionNumber();
 	db.GetStorageManager().SetStorageVersion(options.storage_version.GetIndex());
 	AddStorageVersionTag();
 
 	MainHeader main_header = ConstructMainHeader(options.version_number.GetIndex());
-	SerializeHeaderStructure<MainHeader>(main_header, header_buffer.buffer);
+	SerializeHeaderStructure<MainHeader>(main_header, dev_buffer.buffer);
 	// now write the header to the file
-	ChecksumAndWrite(header_buffer, 0);
-	header_buffer.Clear();
+	ChecksumAndWrite(dev_buffer, 0);
+	dev_buffer.Clear();
 
 	// write the database headers
 	// initialize meta_block and free_list to INVALID_BLOCK because the database file does not contain any actual
 	// content yet
 	DatabaseHeader h1;
+
 	// header 1
 	h1.iteration = 0;
 	h1.meta_block = idx_t(INVALID_BLOCK);
 	h1.free_list = idx_t(INVALID_BLOCK);
 	h1.block_count = 0;
-	// We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
+
+	// We create the SingleNvmeBlockManager with the desired block allocation size before calling CreateNewDatabase.
 	h1.block_alloc_size = GetBlockAllocSize();
 	h1.vector_size = STANDARD_VECTOR_SIZE;
 	h1.serialization_compatibility = options.storage_version.GetIndex();
-	SerializeHeaderStructure<DatabaseHeader>(h1, header_buffer.buffer);
-	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE);
+	SerializeHeaderStructure<DatabaseHeader>(h1, dev_buffer.buffer);
+	ChecksumAndWrite(dev_buffer, Storage::FILE_HEADER_SIZE);
 
 	// header 2
 	DatabaseHeader h2;
@@ -84,46 +102,57 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	h2.meta_block = idx_t(INVALID_BLOCK);
 	h2.free_list = idx_t(INVALID_BLOCK);
 	h2.block_count = 0;
-	// We create the SingleFileBlockManager with the desired block allocation size before calling CreateNewDatabase.
+
+	// We create the SingleNvmeBlockManager with the desired block allocation size before calling CreateNewDatabase.
 	h2.block_alloc_size = GetBlockAllocSize();
 	h2.vector_size = STANDARD_VECTOR_SIZE;
 	h2.serialization_compatibility = options.storage_version.GetIndex();
-	SerializeHeaderStructure<DatabaseHeader>(h2, header_buffer.buffer);
-	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
+	SerializeHeaderStructure<DatabaseHeader>(h2, dev_buffer.buffer);
+	ChecksumAndWrite(dev_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
 
 	// ensure that writing to disk is completed before returning
-	handle->Sync();
+	FileSync();
+
 	// we start with h2 as active_header, this way our initial write will be in h1
 	iteration_count = 0;
 	active_header = 1;
 	max_block = 0;
 }
 
-void SingleFileBlockManager::LoadExistingDatabase() {
-	auto flags = GetFileFlags(false);
-
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
-	if (!handle) {
-		// this can only happen in read-only mode - as that is when we set FILE_FLAGS_NULL_IF_NOT_EXISTS
-		throw IOException("Cannot open database \"%s\" in read-only mode: database does not exist", path);
+void SingleNvmeBlockManager::LoadExistingDatabase() {
+	struct xnvme_opts opts = xnvme_opts_default();
+	dev = xnvme_dev_open(path.c_str(), &opts);
+	if (!dev) {
+		xnvme_cli_perr("xnvme_dev_open()", errno);
+		return;
 	}
 
-	MainHeader::CheckMagicBytes(*handle);
+	size_t buf_size = xnvme_dev_get_geo(dev)->lba_nbytes;
+	char *buf = static_cast<char *>(xnvme_buf_alloc(dev, buf_size));
+	if (!buf) {
+		xnvme_cli_perr("xnvme_buf_alloc()", errno);
+		xnvme_dev_close(dev);
+		return;
+	}
+
+	dev_buffer.Init(dev);
+	dev_buffer.Clear();
+
+	MainHeader::CheckMagicBytes(dev);
+
 	// otherwise, we check the metadata of the file
-	ReadAndChecksum(header_buffer, 0);
-	MainHeader main_header = DeserializeMainHeader(header_buffer.buffer);
+	ReadAndChecksum(dev_buffer, 0);
+	MainHeader main_header = DeserializeMainHeader(dev_buffer.buffer);
 	options.version_number = main_header.version_number;
 
 	// read the database headers from disk
 	DatabaseHeader h1;
-	ReadAndChecksum(header_buffer, Storage::FILE_HEADER_SIZE);
-	h1 = DeserializeDatabaseHeader(main_header, header_buffer.buffer);
+	ReadAndChecksum(dev_buffer, Storage::FILE_HEADER_SIZE);
+	h1 = DeserializeDatabaseHeader(main_header, dev_buffer.buffer);
 
 	DatabaseHeader h2;
-	ReadAndChecksum(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
-	h2 = DeserializeDatabaseHeader(main_header, header_buffer.buffer);
+	ReadAndChecksum(dev_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
+	h2 = DeserializeDatabaseHeader(main_header, dev_buffer.buffer);
 
 	// check the header with the highest iteration count
 	if (h1.iteration > h2.iteration) {
@@ -135,17 +164,18 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 		active_header = 1;
 		Initialize(h2, GetOptionalBlockAllocSize());
 	}
+
 	AddStorageVersionTag();
 	LoadFreeList();
 }
 
-void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
+void SingleNvmeBlockManager::ReadAndChecksum(NvmeBuffer &buf, uint64_t location) const {
 	// read the buffer from disk
-	block.Read(*handle, location);
+	buf.Read(location);
 
 	// compute the checksum
-	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
-	auto computed_checksum = Checksum(block.buffer, block.Size());
+	auto stored_checksum = Load<uint64_t>(buf.InternalBuffer());
+	auto computed_checksum = Checksum(buf.buffer, buf.Size());
 
 	// verify the checksum
 	if (stored_checksum != computed_checksum) {
@@ -155,51 +185,51 @@ void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t locatio
 	}
 }
 
-void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t location) const {
+void SingleNvmeBlockManager::ChecksumAndWrite(NvmeBuffer &buf, uint64_t location) const {
 	// compute the checksum and write it to the start of the buffer (if not temp buffer)
-	uint64_t checksum = Checksum(block.buffer, block.Size());
-	Store<uint64_t>(checksum, block.InternalBuffer());
+	uint64_t checksum = Checksum(buf.buffer, buf.Size());
+	Store<uint64_t>(checksum, buf.InternalBuffer());
 	// now write the buffer
-	block.Write(*handle, location);
+	buf.Write(location);
 }
 
-bool SingleFileBlockManager::IsRemote() {
-	return !handle->OnDiskFile();
+bool SingleNvmeBlockManager::IsRemote() {
+	return false;
 }
 
-unique_ptr<FileBlock> SingleFileBlockManager::ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) {
+unique_ptr<NvmeBlock> SingleNvmeBlockManager::ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) {
 	D_ASSERT(source_buffer.AllocSize() == GetBlockAllocSize());
-	return make_uniq<FileBlock>(source_buffer, block_id);
+	return make_uniq<NvmeBlock>(source_buffer, block_id);
 }
 
-unique_ptr<FileBlock> SingleFileBlockManager::CreateBlock(block_id_t block_id, FileBuffer *source_buffer) {
-	unique_ptr<FileBlock> result;
+unique_ptr<NvmeBlock> SingleNvmeBlockManager::CreateBlock(block_id_t block_id, NvmeBuffer *source_buffer) {
+	unique_ptr<NvmeBlock> result;
 	if (source_buffer) {
 		result = ConvertBlock(block_id, *source_buffer);
 	} else {
-		result = make_uniq<FileBlock>(Allocator::Get(db), block_id, GetBlockSize());
+		result = make_uniq<NvmeBlock>(block_id);
 	}
 	result->Initialize(options.debug_initialize);
 	return result;
 }
 
-idx_t SingleFileBlockManager::GetBlockLocation(block_id_t block_id) {
+idx_t SingleNvmeBlockManager::GetBlockLocation(block_id_t block_id) {
 	return BLOCK_START + NumericCast<idx_t>(block_id) * GetBlockAllocSize();
 }
 
-void SingleFileBlockManager::Read(FileBlock &block) {
+void SingleNvmeBlockManager::Read(NvmeBlock &block) {
 	D_ASSERT(block.id >= 0);
 	D_ASSERT(std::find(free_list.begin(), free_list.end(), block.id) == free_list.end());
 	ReadAndChecksum(block, GetBlockLocation(block.id));
 }
 
-void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) {
+void SingleNvmeBlockManager::ReadBlocks(NvmeBuffer &buffer, block_id_t start_block, idx_t block_count) {
 	D_ASSERT(start_block >= 0);
 	D_ASSERT(block_count >= 1);
 
 	// read the buffer from disk
 	auto location = GetBlockLocation(start_block);
-	buffer.Read(*handle, location);
+	buffer.Read(location);
 
 	// for each of the blocks - verify the checksum
 	auto ptr = buffer.InternalBuffer();
@@ -218,34 +248,17 @@ void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_blo
 	}
 }
 
-void SingleFileBlockManager::Write(FileBuffer &buffer, block_id_t block_id) {
+void SingleNvmeBlockManager::Write(NvmeBuffer &buffer, block_id_t block_id) {
 	D_ASSERT(block_id >= 0);
 	ChecksumAndWrite(buffer, BLOCK_START + NumericCast<idx_t>(block_id) * GetBlockAllocSize());
 }
 
-void SingleFileBlockManager::Truncate() {
-	BlockManager::Truncate();
-	idx_t blocks_to_truncate = 0;
-	// reverse iterate over the free-list
-	for (auto entry = free_list.rbegin(); entry != free_list.rend(); entry++) {
-		auto block_id = *entry;
-		if (block_id + 1 != max_block) {
-			break;
-		}
-		blocks_to_truncate++;
-		max_block--;
-	}
-	if (blocks_to_truncate == 0) {
-		// nothing to truncate
-		return;
-	}
-	// truncate the file
-	free_list.erase(free_list.lower_bound(max_block), free_list.end());
-	newly_freed_list.erase(newly_freed_list.lower_bound(max_block), newly_freed_list.end());
-	handle->Truncate(NumericCast<int64_t>(BLOCK_START + NumericCast<idx_t>(max_block) * GetBlockAllocSize()));
+void SingleNvmeBlockManager::Truncate() {
+	// TODOTODO: can we do this with xnvme?
+	return;
 }
 
-void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
+void SingleNvmeBlockManager::WriteHeader(DatabaseHeader header) {
 	auto free_list_blocks = GetFreeListBlocks();
 
 	// now handle the free list
@@ -298,56 +311,47 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	}
 
 	// We need to fsync BEFORE we write the header to ensure that all the previous blocks are written as well
-	handle->Sync();
+	FileSync();
 
-	header_buffer.Clear();
+	dev_buffer.Clear();
 	// if we are upgrading the database from version 64 -> version 65, we need to re-write the main header
 	if (options.version_number.GetIndex() == 64 && options.storage_version.GetIndex() >= 4) {
 		// rewrite the main header
 		options.version_number = 65;
 		MainHeader main_header = ConstructMainHeader(options.version_number.GetIndex());
-		SerializeHeaderStructure<MainHeader>(main_header, header_buffer.buffer);
+		SerializeHeaderStructure<MainHeader>(main_header, dev_buffer.buffer);
 		// now write the header to the file
-		ChecksumAndWrite(header_buffer, 0);
-		header_buffer.Clear();
+		ChecksumAndWrite(dev_buffer, 0);
+		dev_buffer.Clear();
 	}
 
 	// set the header inside the buffer
 	MemoryStream serializer(Allocator::Get(db));
 	header.Write(serializer);
-	memcpy(header_buffer.buffer, serializer.GetData(), serializer.GetPosition());
+	memcpy(dev_buffer.buffer, serializer.GetData(), serializer.GetPosition());
+
 	// now write the header to the file, active_header determines whether we write to h1 or h2
 	// note that if active_header is h1 we write to h2, and vice versa
-	ChecksumAndWrite(header_buffer, active_header == 1 ? Storage::FILE_HEADER_SIZE : Storage::FILE_HEADER_SIZE * 2);
+	ChecksumAndWrite(dev_buffer, active_header == 1 ? Storage::FILE_HEADER_SIZE : Storage::FILE_HEADER_SIZE * 2);
+
 	// switch active header to the other header
 	active_header = 1 - active_header;
+
 	//! Ensure the header write ends up on disk
-	handle->Sync();
+	FileSync();
+
 	// Release the free blocks to the filesystem.
 	TrimFreeBlocks();
 }
 
-void SingleFileBlockManager::FileSync() {
-	handle->Sync();
+void SingleNvmeBlockManager::FileSync() {
+	// TODOTODO: can we do this with xnvme?
+	return;
 }
 
-void SingleFileBlockManager::TrimFreeBlocks() {
-	if (DBConfig::Get(db).options.trim_free_blocks) {
-		for (auto itr = newly_freed_list.begin(); itr != newly_freed_list.end(); ++itr) {
-			block_id_t first = *itr;
-			block_id_t last = first;
-			// Find end of contiguous range.
-			for (++itr; itr != newly_freed_list.end() && (*itr == last + 1); ++itr) {
-				last = *itr;
-			}
-			// We are now one too far.
-			--itr;
-			// Trim the range.
-			handle->Trim(BLOCK_START + (NumericCast<idx_t>(first) * GetBlockAllocSize()),
-			             NumericCast<idx_t>(last + 1 - first) * GetBlockAllocSize());
-		}
-	}
-	newly_freed_list.clear();
+void SingleNvmeBlockManager::TrimFreeBlocks() {
+	// TODOTODO: can we do this with xnvme?
+	return;
 }
 
 } // namespace duckdb

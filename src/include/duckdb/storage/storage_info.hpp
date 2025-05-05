@@ -12,6 +12,7 @@
 #include "duckdb/common/limits.hpp"
 #include "duckdb/common/string.hpp"
 #include "duckdb/common/vector_size.hpp"
+#include <libxnvme.h>
 
 namespace duckdb {
 struct FileHandle;
@@ -78,6 +79,7 @@ struct MainHeader {
 	//! The set of flags used by the database
 	uint64_t flags[FLAG_COUNT];
 	static void CheckMagicBytes(FileHandle &handle);
+	static void CheckMagicBytes(xnvme_dev *dev);
 
 	string LibraryGitDesc() {
 		return string(char_ptr_cast(library_git_desc), 0, MAX_VERSION_SIZE);

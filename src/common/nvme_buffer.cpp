@@ -13,6 +13,10 @@
 
 namespace duckdb {
 
+NvmeBuffer::NvmeBuffer(DBBufferType type) : DBBuffer(type) {
+	Init();
+}
+
 NvmeBuffer::NvmeBuffer(NvmeBuffer &source, DBBufferType type) : DBBuffer(type) {
 	// take over the structures of the source buffer
 	buffer = source.buffer;
@@ -20,16 +24,14 @@ NvmeBuffer::NvmeBuffer(NvmeBuffer &source, DBBufferType type) : DBBuffer(type) {
 	internal_buffer = source.internal_buffer;
 	internal_size = source.internal_size;
 
-	source.Init();
+	source.Init(source.dev);
 }
 
 NvmeBuffer::~NvmeBuffer() {
 	if (!internal_buffer) {
-		goto exit;
+		return;
 	}
 	xnvme_buf_free(dev, internal_buffer);
-exit:
-	xnvme_dev_close(dev);
 }
 
 void NvmeBuffer::Init() {
@@ -37,6 +39,15 @@ void NvmeBuffer::Init() {
 	size = 0;
 	internal_buffer = nullptr;
 	internal_size = 0;
+}
+
+void NvmeBuffer::Init(xnvme_dev *dev) {
+	this->dev = dev;
+	buffer = nullptr;
+	size = 0;
+	internal_buffer = nullptr;
+	internal_size = 0;
+	Resize(xnvme_dev_get_geo(dev)->lba_nbytes);
 }
 
 void NvmeBuffer::ReallocBuffer(idx_t new_size) {
@@ -64,14 +75,14 @@ void NvmeBuffer::Read(uint64_t location) {
 	D_ASSERT(type != DBBufferType::TINY_BUFFER);
 
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-	xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), 0, 0, internal_buffer, nullptr);
+	xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), location, 1, internal_buffer, nullptr);
 }
 
 void NvmeBuffer::Write(uint64_t location) {
 	D_ASSERT(type != DBBufferType::TINY_BUFFER);
 
 	xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-	xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), 0, 0, internal_buffer, nullptr);
+	xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), location, 1, internal_buffer, nullptr);
 }
 
 void NvmeBuffer::Clear() {

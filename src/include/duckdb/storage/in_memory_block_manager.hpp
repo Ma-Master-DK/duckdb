@@ -23,7 +23,13 @@ public:
 	unique_ptr<FileBlock> ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) override {
 		throw InternalException("Cannot perform IO in in-memory database - ConvertBlock!");
 	}
+	unique_ptr<NvmeBlock> ConvertBlock(block_id_t block_id, NvmeBuffer &source_buffer) override {
+		throw InternalException("Cannot perform IO in in-memory database - ConvertBlock!");
+	}
 	unique_ptr<FileBlock> CreateBlock(block_id_t block_id, FileBuffer *source_buffer) override {
+		throw InternalException("Cannot perform IO in in-memory database - CreateBlock!");
+	}
+	unique_ptr<NvmeBlock> CreateBlock(block_id_t block_id, NvmeBuffer *source_buffer) override {
 		throw InternalException("Cannot perform IO in in-memory database - CreateBlock!");
 	}
 	block_id_t GetFreeBlockId() override {
@@ -53,10 +59,19 @@ public:
 	void Read(FileBlock &block) override {
 		throw InternalException("Cannot perform IO in in-memory database - Read!");
 	}
+	void Read(NvmeBlock &block) override {
+		throw InternalException("Cannot perform IO in in-memory database - Read!");
+	}
 	void ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) override {
 		throw InternalException("Cannot perform IO in in-memory database - ReadBlocks!");
 	}
+	void ReadBlocks(NvmeBuffer &buffer, block_id_t start_block, idx_t block_count) override {
+		throw InternalException("Cannot perform IO in in-memory database - ReadBlocks!");
+	}
 	void Write(FileBuffer &block, block_id_t block_id) override {
+		throw InternalException("Cannot perform IO in in-memory database - Write!");
+	}
+	void Write(NvmeBuffer &block, block_id_t block_id) override {
 		throw InternalException("Cannot perform IO in in-memory database - Write!");
 	}
 	void WriteHeader(DatabaseHeader header) override {
