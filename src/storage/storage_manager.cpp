@@ -12,6 +12,7 @@
 #include "duckdb/storage/in_memory_block_manager.hpp"
 #include "duckdb/storage/object_cache.hpp"
 #include "duckdb/storage/single_file_block_manager.hpp"
+#include "duckdb/storage/single_nvme_block_manager.hpp"
 #include "duckdb/transaction/transaction_manager.hpp"
 #include "duckdb/common/serializer/memory_stream.hpp"
 #include "duckdb/storage/storage_extension.hpp"
@@ -162,7 +163,8 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	}
 	// Check if the database file already exists.
 	// Note: a file can also exist if there was a ROLLBACK on a previous transaction creating that file.
-	if (!read_only && !fs.FileExists(path)) {
+	// if (!read_only && !fs.FileExists(path)) {
+	if (true) { // TODOTODO: dynamically decide if db exists already when it's on a device
 		// file does not exist and we are in read-write mode
 		// create a new file
 
@@ -189,7 +191,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		}
 
 		// Initialize the block manager before creating a new database.
-		auto sf_block_manager = make_uniq<SingleFileBlockManager>(db, path, options);
+		auto sf_block_manager = make_uniq<SingleNvmeBlockManager>(db, path, options);
 		sf_block_manager->CreateNewDatabase();
 		block_manager = std::move(sf_block_manager);
 		table_io_manager = make_uniq<SingleFileTableIOManager>(*block_manager, row_group_size);
@@ -201,7 +203,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		// Initialize the block manager while loading the database file.
 		// We'll construct the SingleFileBlockManager with the default block allocation size,
 		// and later adjust it when reading the file header.
-		auto sf_block_manager = make_uniq<SingleFileBlockManager>(db, path, options);
+		auto sf_block_manager = make_uniq<SingleNvmeBlockManager>(db, path, options);
 		sf_block_manager->LoadExistingDatabase();
 		block_manager = std::move(sf_block_manager);
 		table_io_manager = make_uniq<SingleFileTableIOManager>(*block_manager, row_group_size);
