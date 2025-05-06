@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// duckdb/storage/buffer/file_buffer_pool.hpp
+// duckdb/storage/buffer/db_buffer_pool.hpp
 //
 //
 //===----------------------------------------------------------------------===//
@@ -9,42 +9,42 @@
 #pragma once
 
 #include "duckdb/common/array.hpp"
+#include "duckdb/common/atomic.hpp"
 #include "duckdb/common/enums/memory_tag.hpp"
-#include "duckdb/common/file_buffer.hpp"
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/common/typedefs.hpp"
-#include "duckdb/storage/buffer/db_buffer_pool.hpp"
-#include "duckdb/storage/buffer/file_block_handle.hpp"
+#include "duckdb/common/vector.hpp"
 
 namespace duckdb {
 
 class TemporaryMemoryManager;
 struct EvictionQueue;
 
-struct BufferEvictionNode {
-	BufferEvictionNode() {
-	}
-	BufferEvictionNode(weak_ptr<FileBlockHandle> handle_p, idx_t eviction_seq_num);
+// struct BufferEvictionNode {
+// 	BufferEvictionNode() {
+// 	}
+//
+// 	BufferEvictionNode(weak_ptr<FileBlockHandle> handle_p, idx_t eviction_seq_num);
+//
+// 	weak_ptr<FileBlockHandle> handle;
+// 	idx_t handle_sequence_number;
+//
+// 	bool CanUnload(FileBlockHandle &handle_p);
+// 	shared_ptr<FileBlockHandle> TryGetFileBlockHandle();
+// };
 
-	weak_ptr<FileBlockHandle> handle;
-	idx_t handle_sequence_number;
-
-	bool CanUnload(FileBlockHandle &handle_p);
-	shared_ptr<FileBlockHandle> TryGetFileBlockHandle();
-};
-
-//! The FileBufferPool is in charge of handling memory management for one or more databases. It defines memory limits
+//! The DbBufferPool is in charge of handling memory management for one or more databases. It defines memory limits
 //! and implements priority eviction among all users of the pool.
-class FileBufferPool : DbBufferPool {
+class DbBufferPool {
 	friend class FileBlockHandle;
 	friend class BlockManager;
 	friend class BufferManager;
 	friend class StandardBufferManager;
 
 public:
-	FileBufferPool(idx_t maximum_memory, bool track_eviction_timestamps,
-	               idx_t allocator_bulk_deallocation_flush_threshold);
-	virtual ~FileBufferPool();
+	DbBufferPool(idx_t maximum_memory, bool track_eviction_timestamps,
+	             idx_t allocator_bulk_deallocation_flush_threshold);
+	virtual ~DbBufferPool();
 
 	//! Set a new memory limit to the buffer pool, throws an exception if the new limit is too low and not enough
 	//! blocks can be evicted
@@ -73,7 +73,7 @@ protected:
 	//! reservation handle, which can be moved to the FileBlockHandle that will own the reservation.
 	struct EvictionResult {
 		bool success;
-		TempFileBufferPoolReservation reservation;
+		TempDbBufferPoolReservation reservation;
 	};
 
 	virtual EvictionResult EvictBlocks(MemoryTag tag, idx_t extra_memory, idx_t memory_limit,
@@ -107,6 +107,72 @@ protected:
 	const array<idx_t, DB_BUFFER_TYPE_COUNT> eviction_queue_sizes;
 
 protected:
+	enum class MemoryUsageCaches {
+		FLUSH,
+		NO_FLUSH,
+	};
+
+	struct MemoryUsage {
+		//! The maximum difference between memory statistics and actual usage is 2MB (64 * 32k)
+		static constexpr idx_t MEMORY_USAGE_CACHE_COUNT = 64;
+		static constexpr idx_t MEMORY_USAGE_CACHE_THRESHOLD = 32 << 10;
+		static constexpr idx_t TOTAL_MEMORY_USAGE_INDEX = MEMORY_TAG_COUNT;
+		using MemoryUsageCounters = array<atomic<int64_t>, MEMORY_TAG_COUNT + 1>;
+
+		//! global memory usage counters
+		MemoryUsageCounters memory_usage;
+
+		//! cache memory usage to improve performance
+		array<MemoryUsageCounters, MEMORY_USAGE_CACHE_COUNT> memory_usage_caches;
+
+		MemoryUsage();
+
+		idx_t GetUsedMemory(MemoryUsageCaches cache) {
+			return GetUsedMemory(TOTAL_MEMORY_USAGE_INDEX, cache);
+		}
+
+		idx_t GetUsedMemory(MemoryTag tag, MemoryUsageCaches cache) {
+			return GetUsedMemory((idx_t)tag, cache);
+		}
+
+		idx_t GetUsedMemory(idx_t index, MemoryUsageCaches cache) {
+			if (cache == MemoryUsageCaches::NO_FLUSH) {
+				auto used_memory = memory_usage[index].load(std::memory_order_relaxed);
+				return used_memory > 0 ? static_cast<idx_t>(used_memory) : 0;
+			}
+			int64_t cached = 0;
+			for (auto &cache : memory_usage_caches) {
+				cached += cache[index].exchange(0, std::memory_order_relaxed);
+			}
+			auto used_memory = memory_usage[index].fetch_add(cached, std::memory_order_relaxed) + cached;
+			return used_memory > 0 ? static_cast<idx_t>(used_memory) : 0;
+		}
+
+		void UpdateUsedMemory(MemoryTag tag, int64_t size);
+	};
+
+	//! The lock for changing the memory limit
+	mutex limit_lock;
+
+	//! The maximum amount of memory that the buffer manager can keep (in bytes)
+	atomic<idx_t> maximum_memory;
+
+	//! If bulk deallocation larger than this occurs, flush outstanding allocations
+	atomic<idx_t> allocator_bulk_deallocation_flush_threshold;
+
+	//! Record timestamps of buffer manager unpin() events. Usable by custom eviction policies.
+	bool track_eviction_timestamps;
+
+	//! Eviction queues
+	vector<unique_ptr<EvictionQueue>> queues;
+
+	//! Memory manager for concurrently used temporary memory, e.g., for physical operators
+	unique_ptr<TemporaryMemoryManager> temporary_memory_manager;
+
+	//! To improve performance, MemoryUsage maintains counter caches based on current cpu or thread id,
+	//! and only updates the global counter when the cache value exceeds a threshold.
+	//! Therefore, the statistics may have slight differences from the actual memory usage.
+	mutable MemoryUsage memory_usage;
 };
 
 } // namespace duckdb

@@ -9,24 +9,18 @@
 
 namespace duckdb {
 
-FileBlockHandle::FileBlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag)
-    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(DBBufferType::BLOCK),
-      buffer(nullptr), eviction_seq_num(0), destroy_buffer_upon(DestroyBufferUpon::BLOCK),
-      memory_charge(tag, block_manager.buffer_manager.GetFileBufferPool()), unswizzled(nullptr),
-      eviction_queue_idx(DConstants::INVALID_INDEX) {
+FileBlockHandle::FileBlockHandle(BlockManager &block_manager, block_id_t block_id, MemoryTag tag)
+    : DbBlockHandle(block_manager, block_id, tag), buffer(nullptr) {
 	eviction_seq_num = 0;
 	state = BlockState::BLOCK_UNLOADED;
 	memory_usage = block_manager.GetBlockAllocSize();
 }
 
-FileBlockHandle::FileBlockHandle(BlockManager &block_manager, block_id_t block_id_p, MemoryTag tag,
-                                 unique_ptr<FileBuffer> buffer_p, DestroyBufferUpon destroy_buffer_upon_p,
-                                 idx_t block_size, FileBufferPoolReservation &&reservation)
-    : block_manager(block_manager), readers(0), block_id(block_id_p), tag(tag), buffer_type(buffer_p->GetBufferType()),
-      eviction_seq_num(0), destroy_buffer_upon(destroy_buffer_upon_p),
-      memory_charge(tag, block_manager.buffer_manager.GetFileBufferPool()), unswizzled(nullptr),
-      eviction_queue_idx(DConstants::INVALID_INDEX) {
-	buffer = std::move(buffer_p);
+FileBlockHandle::FileBlockHandle(BlockManager &block_manager, block_id_t block_id, MemoryTag tag,
+                                 unique_ptr<FileBuffer> buffer, DestroyBufferUpon destroy_buffer_upon, idx_t block_size,
+                                 DbBufferPoolReservation &&reservation)
+    : DbBlockHandle(block_manager, block_id, tag, buffer->GetBufferType()) {
+	this->buffer = std::move(buffer);
 	state = BlockState::BLOCK_LOADED;
 	memory_usage = block_size;
 	memory_charge = std::move(reservation);
@@ -95,37 +89,9 @@ unique_ptr<NvmeBlock> AllocateBlock(BlockManager &block_manager, unique_ptr<Nvme
 	}
 }
 
-void FileBlockHandle::ChangeMemoryUsage(BlockLock &l, int64_t delta) {
-	VerifyMutex(l);
-
-	D_ASSERT(delta < 0);
-	memory_usage += static_cast<idx_t>(delta);
-	memory_charge.Resize(memory_usage);
-}
-
 unique_ptr<FileBuffer> &FileBlockHandle::GetBuffer(BlockLock &l) {
 	VerifyMutex(l);
 	return buffer;
-}
-
-void FileBlockHandle::VerifyMutex(BlockLock &l) const {
-	D_ASSERT(l.owns_lock());
-	D_ASSERT(l.mutex() == &lock);
-}
-
-FileBufferPoolReservation &FileBlockHandle::GetMemoryCharge(BlockLock &l) {
-	VerifyMutex(l);
-	return memory_charge;
-}
-
-void FileBlockHandle::MergeMemoryReservation(BlockLock &l, FileBufferPoolReservation reservation) {
-	VerifyMutex(l);
-	memory_charge.Merge(std::move(reservation));
-}
-
-void FileBlockHandle::ResizeMemory(BlockLock &l, idx_t alloc_size) {
-	VerifyMutex(l);
-	memory_charge.Resize(alloc_size);
 }
 
 void FileBlockHandle::ResizeBuffer(BlockLock &l, idx_t block_size, int64_t memory_delta) {
@@ -139,7 +105,7 @@ void FileBlockHandle::ResizeBuffer(BlockLock &l, idx_t block_size, int64_t memor
 }
 
 FileBufferHandle FileBlockHandle::LoadFromBuffer(BlockLock &l, data_ptr_t data, unique_ptr<FileBuffer> reusable_buffer,
-                                                 FileBufferPoolReservation reservation) {
+                                                 DbBufferPoolReservation reservation) {
 	VerifyMutex(l);
 
 	D_ASSERT(state != BlockState::BLOCK_LOADED);
@@ -200,26 +166,6 @@ unique_ptr<FileBuffer> FileBlockHandle::UnloadAndTakeBlock(BlockLock &lock) {
 void FileBlockHandle::Unload(BlockLock &lock) {
 	auto block = UnloadAndTakeBlock(lock);
 	block.reset();
-}
-
-bool FileBlockHandle::CanUnload() const {
-	if (state == BlockState::BLOCK_UNLOADED) {
-		// already unloaded
-		return false;
-	}
-	if (readers > 0) {
-		// there are active readers
-		return false;
-	}
-	if (block_id >= MAXIMUM_BLOCK && MustWriteToTemporaryFile() &&
-	    !block_manager.buffer_manager.HasTemporaryDirectory()) {
-		// this block cannot be destroyed upon evict/unpin
-		// in order to unload this block we need to write it to a temporary buffer
-		// however, no temporary directory is specified!
-		// hence we cannot unload the block
-		return false;
-	}
-	return true;
 }
 
 void FileBlockHandle::ConvertToPersistent(BlockLock &l, FileBlockHandle &new_block, unique_ptr<FileBuffer> new_buffer) {
