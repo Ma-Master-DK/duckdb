@@ -65,14 +65,14 @@ public:
 		throw IOException("NvmeBuffer not allowed for SingleFileBlockManager.");
 	}
 
-	//! Write the header to disk, this is the final step of the checkpointing process
-	void WriteHeader(DatabaseHeader header) override;
-
 	bool IsRemote() override;
 
 	void FileSync() override;
 
 	void Truncate() override;
+
+	//! Write the header to disk, this is the final step of the checkpointing process
+	void WriteHeader(DatabaseHeader header) override;
 
 private:
 	//! The location in the file where the block writing starts

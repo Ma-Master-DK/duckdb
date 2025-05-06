@@ -2,17 +2,20 @@
 
 #include "duckdb/common/assert.hpp"
 #include "duckdb/common/db_buffer.hpp"
-#include "duckdb/common/nvme_buffer.hpp"
-#include "duckdb/storage/storage_info.hpp"
 
 namespace duckdb {
 
-NvmeBlock::NvmeBlock(block_id_t id) : Block(id), NvmeBuffer(DBBufferType::BLOCK) {
+NvmeBlock::NvmeBlock(Allocator &allocator, const block_id_t id, const idx_t block_size)
+    : Block(id), NvmeBuffer(allocator, DBBufferType::BLOCK, block_size) {
+}
+
+NvmeBlock::NvmeBlock(Allocator &allocator, block_id_t id, uint32_t internal_size)
+    : Block(id), NvmeBuffer(allocator, DBBufferType::BLOCK, internal_size) {
+	D_ASSERT((AllocSize() & (Storage::SECTOR_SIZE - 1)) == 0);
 }
 
 NvmeBlock::NvmeBlock(NvmeBuffer &source, block_id_t id) : Block(id), NvmeBuffer(source, DBBufferType::BLOCK) {
-	// TODOTODO: can we do this with xnvme?
-	// D_ASSERT((AllocSize() & (Storage::SECTOR_SIZE - 1)) == 0);
+	D_ASSERT((AllocSize() & (Storage::SECTOR_SIZE - 1)) == 0);
 }
 
 } // namespace duckdb

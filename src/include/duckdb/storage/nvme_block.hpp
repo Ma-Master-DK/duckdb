@@ -17,7 +17,8 @@ namespace duckdb {
 
 class NvmeBlock : public Block, public NvmeBuffer {
 public:
-	NvmeBlock(block_id_t id);
+	NvmeBlock(Allocator &allocator, const block_id_t id, const idx_t block_size);
+	NvmeBlock(Allocator &allocator, block_id_t id, u_int32_t internal_size);
 	NvmeBlock(NvmeBuffer &source, block_id_t id);
 };
 

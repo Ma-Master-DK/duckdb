@@ -12,6 +12,7 @@
 #include "duckdb/common/enums/debug_initialize.hpp"
 
 namespace duckdb {
+class Allocator;
 
 enum class DBBufferType : uint8_t { BLOCK = 1, MANAGED_BUFFER = 2, TINY_BUFFER = 3 };
 
@@ -19,7 +20,11 @@ static constexpr idx_t DB_BUFFER_TYPE_COUNT = 3;
 
 class DBBuffer {
 public:
-	DBBuffer(DBBufferType type);
+	//! Allocates a buffer of the specified size, with room for additional header bytes
+	//! (typically 8 bytes). On return, this->AllocSize() >= this->size >= user_size.
+	//! Our allocation size will always be page-aligned, which is necessary to support
+	//! DIRECT_IO
+	DBBuffer(Allocator &allocator, DBBufferType type);
 
 	virtual ~DBBuffer();
 
@@ -30,8 +35,10 @@ public:
 	//! This is equivalent to internal_size - BLOCK_HEADER_SIZE.
 	uint64_t size;
 
+	Allocator &allocator;
+
 public:
-	virtual void Clear() = 0;
+	void Clear();
 
 	DBBufferType GetBufferType() const {
 		return type;
@@ -60,7 +67,7 @@ public:
 
 	MemoryRequirement CalculateMemory(uint64_t user_size);
 
-	virtual void Initialize(DebugInitialize info) = 0;
+	void Initialize(DebugInitialize info);
 
 protected:
 	//! The type of the buffer.
@@ -74,9 +81,9 @@ protected:
 	//! This is the size that is read from or written to disk.
 	uint64_t internal_size;
 
-	virtual void ReallocBuffer(idx_t new_size) = 0;
+	void ReallocBuffer(idx_t new_size);
 
-	virtual void Init() = 0;
+	void Init();
 };
 
 } // namespace duckdb

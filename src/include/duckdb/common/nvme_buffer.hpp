@@ -19,29 +19,15 @@ namespace duckdb {
 //! The NvmeBuffer represents a buffer that can be read or written to an NVMe device
 class NvmeBuffer : public DBBuffer {
 public:
-	NvmeBuffer(DBBufferType type);
+	NvmeBuffer(Allocator &allocator, DBBufferType type, uint64_t user_size);
 	NvmeBuffer(NvmeBuffer &source, DBBufferType type);
-
-	~NvmeBuffer() override;
 
 public:
 	//! Read into the NvmeBuffer from the specified location.
-	void Read(uint64_t location);
+	void Read(xnvme_dev *dev, uint64_t location);
 
 	//! Write the contents of the NvmeBuffer to the specified location.
-	void Write(uint64_t location);
-
-	void Clear() override;
-
-	void Initialize(DebugInitialize info) override;
-
-	void ReallocBuffer(idx_t new_size) override;
-
-	void Init() override;
-	void Init(xnvme_dev *dev);
-
-private:
-	xnvme_dev *dev;
+	void Write(xnvme_dev *dev, uint64_t location);
 };
 
 } // namespace duckdb

@@ -39,7 +39,7 @@ class SingleDbBlockManager : public BlockManager {
 public:
 	SingleDbBlockManager(AttachedDatabase &db, const string &path, const StorageManagerOptions &options);
 
-	virtual ~SingleDbBlockManager();
+	~SingleDbBlockManager() override;
 
 public:
 	FileOpenFlags GetFileFlags(bool create_new) const;

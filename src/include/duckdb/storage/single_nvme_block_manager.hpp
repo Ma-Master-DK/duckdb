@@ -65,14 +65,14 @@ public:
 		throw IOException("FileBuffer not allowed for SingleNvmeBlockManager.");
 	}
 
-	//! Write the header to disk, this is the final step of the checkpointing process
-	void WriteHeader(DatabaseHeader header) override;
-
 	bool IsRemote() override;
 
 	void FileSync() override;
 
 	void Truncate() override;
+
+	//! Write the header to disk, this is the final step of the checkpointing process
+	void WriteHeader(DatabaseHeader header) override;
 
 private:
 	//! The location in the file where the block writing starts
@@ -90,7 +90,7 @@ private:
 	xnvme_dev *dev;
 
 	//! The buffer used to read/write to the headers
-	NvmeBuffer dev_buffer;
+	NvmeBuffer header_buffer;
 };
 
 } // namespace duckdb

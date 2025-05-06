@@ -245,6 +245,29 @@ void SingleFileBlockManager::Truncate() {
 	handle->Truncate(NumericCast<int64_t>(BLOCK_START + NumericCast<idx_t>(max_block) * GetBlockAllocSize()));
 }
 
+void SingleFileBlockManager::FileSync() {
+	handle->Sync();
+}
+
+void SingleFileBlockManager::TrimFreeBlocks() {
+	if (DBConfig::Get(db).options.trim_free_blocks) {
+		for (auto itr = newly_freed_list.begin(); itr != newly_freed_list.end(); ++itr) {
+			block_id_t first = *itr;
+			block_id_t last = first;
+			// Find end of contiguous range.
+			for (++itr; itr != newly_freed_list.end() && (*itr == last + 1); ++itr) {
+				last = *itr;
+			}
+			// We are now one too far.
+			--itr;
+			// Trim the range.
+			handle->Trim(BLOCK_START + (NumericCast<idx_t>(first) * GetBlockAllocSize()),
+			             NumericCast<idx_t>(last + 1 - first) * GetBlockAllocSize());
+		}
+	}
+	newly_freed_list.clear();
+}
+
 void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	auto free_list_blocks = GetFreeListBlocks();
 
@@ -298,7 +321,7 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	}
 
 	// We need to fsync BEFORE we write the header to ensure that all the previous blocks are written as well
-	handle->Sync();
+	FileSync();
 
 	header_buffer.Clear();
 	// if we are upgrading the database from version 64 -> version 65, we need to re-write the main header
@@ -316,38 +339,19 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	MemoryStream serializer(Allocator::Get(db));
 	header.Write(serializer);
 	memcpy(header_buffer.buffer, serializer.GetData(), serializer.GetPosition());
+
 	// now write the header to the file, active_header determines whether we write to h1 or h2
 	// note that if active_header is h1 we write to h2, and vice versa
 	ChecksumAndWrite(header_buffer, active_header == 1 ? Storage::FILE_HEADER_SIZE : Storage::FILE_HEADER_SIZE * 2);
+
 	// switch active header to the other header
 	active_header = 1 - active_header;
+
 	//! Ensure the header write ends up on disk
-	handle->Sync();
+	FileSync();
+
 	// Release the free blocks to the filesystem.
 	TrimFreeBlocks();
-}
-
-void SingleFileBlockManager::FileSync() {
-	handle->Sync();
-}
-
-void SingleFileBlockManager::TrimFreeBlocks() {
-	if (DBConfig::Get(db).options.trim_free_blocks) {
-		for (auto itr = newly_freed_list.begin(); itr != newly_freed_list.end(); ++itr) {
-			block_id_t first = *itr;
-			block_id_t last = first;
-			// Find end of contiguous range.
-			for (++itr; itr != newly_freed_list.end() && (*itr == last + 1); ++itr) {
-				last = *itr;
-			}
-			// We are now one too far.
-			--itr;
-			// Trim the range.
-			handle->Trim(BLOCK_START + (NumericCast<idx_t>(first) * GetBlockAllocSize()),
-			             NumericCast<idx_t>(last + 1 - first) * GetBlockAllocSize());
-		}
-	}
-	newly_freed_list.clear();
 }
 
 } // namespace duckdb
