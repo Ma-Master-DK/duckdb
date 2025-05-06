@@ -52,7 +52,7 @@ void CSVBuffer::AllocateBuffer(idx_t buffer_size) {
 	bool can_destroy = !is_pipe;
 	handle = buffer_manager.Allocate(MemoryTag::CSV_READER, MaxValue<idx_t>(buffer_manager.GetBlockSize(), buffer_size),
 	                                 can_destroy);
-	block = handle.GetBlockHandle();
+	block = handle.GetFileBlockHandle();
 }
 
 idx_t CSVBuffer::GetBufferSize() const {
@@ -66,7 +66,7 @@ void CSVBuffer::Reload(CSVFileHandle &file_handle) {
 	file_handle.Read(handle.Ptr(), actual_buffer_size);
 }
 
-shared_ptr<CSVBufferHandle> CSVBuffer::Pin(CSVFileHandle &file_handle, bool &has_seeked) {
+shared_ptr<CSVFileBufferHandle> CSVBuffer::Pin(CSVFileHandle &file_handle, bool &has_seeked) {
 	auto &buffer_manager = BufferManager::GetBufferManager(context);
 	if (!is_pipe && block->IsUnloaded()) {
 		// We have to reload it from disk
@@ -74,8 +74,8 @@ shared_ptr<CSVBufferHandle> CSVBuffer::Pin(CSVFileHandle &file_handle, bool &has
 		Reload(file_handle);
 		has_seeked = true;
 	}
-	return make_shared_ptr<CSVBufferHandle>(buffer_manager.Pin(block), actual_buffer_size, requested_size, last_buffer,
-	                                        buffer_idx);
+	return make_shared_ptr<CSVFileBufferHandle>(buffer_manager.Pin(block), actual_buffer_size, requested_size,
+	                                            last_buffer, buffer_idx);
 }
 
 void CSVBuffer::Unpin() {

@@ -9,11 +9,11 @@
 #pragma once
 
 #include "duckdb/common/common.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 
 namespace duckdb {
 class BufferManager;
-class BlockHandle;
+class FileBlockHandle;
 struct UndoBufferEntry;
 struct UndoBufferPointer;
 
@@ -23,7 +23,7 @@ struct UndoBufferEntry {
 	~UndoBufferEntry();
 
 	BufferManager &buffer_manager;
-	shared_ptr<BlockHandle> block;
+	shared_ptr<FileBlockHandle> block;
 	idx_t position = 0;
 	idx_t capacity = 0;
 	unique_ptr<UndoBufferEntry> next;
@@ -33,12 +33,12 @@ struct UndoBufferEntry {
 struct UndoBufferReference {
 	UndoBufferReference() : entry(nullptr), position(0) {
 	}
-	UndoBufferReference(UndoBufferEntry &entry_p, BufferHandle handle_p, idx_t position)
+	UndoBufferReference(UndoBufferEntry &entry_p, FileBufferHandle handle_p, idx_t position)
 	    : entry(&entry_p), handle(std::move(handle_p)), position(position) {
 	}
 
 	optional_ptr<UndoBufferEntry> entry;
-	BufferHandle handle;
+	FileBufferHandle handle;
 	idx_t position;
 
 	data_ptr_t Ptr() {

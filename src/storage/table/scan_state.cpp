@@ -240,7 +240,7 @@ bool CollectionScanState::ScanCommitted(DataChunk &result, TableScanType type) {
 PrefetchState::~PrefetchState() {
 }
 
-void PrefetchState::AddBlock(shared_ptr<BlockHandle> block) {
+void PrefetchState::AddBlock(shared_ptr<FileBlockHandle> block) {
 	blocks.push_back(std::move(block));
 }
 

@@ -21,7 +21,7 @@ public:
 	PartialBlockManager &partial_block_manager;
 
 	//! Temporary buffer
-	BufferHandle handle;
+	FileBufferHandle handle;
 	//! The block on-disk to which we are writing
 	block_id_t block_id;
 	//! The offset within the current block

@@ -221,7 +221,7 @@ struct RLECompressState : public CompressionState {
 	ColumnDataCheckpointData &checkpoint_data;
 	CompressionFunction &function;
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle handle;
+	FileBufferHandle handle;
 
 	RLEState<T> state;
 	idx_t entry_count = 0;
@@ -293,7 +293,7 @@ struct RLEScanState : public SegmentScanState {
 		return position_in_entry >= index_pointer[entry_pos];
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 	idx_t entry_pos;
 	idx_t position_in_entry;
 	uint32_t rle_count_offset;

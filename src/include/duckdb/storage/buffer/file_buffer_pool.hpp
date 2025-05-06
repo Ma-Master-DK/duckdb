@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// duckdb/storage/buffer/buffer_pool.hpp
+// duckdb/storage/buffer/file_buffer_pool.hpp
 //
 //
 //===----------------------------------------------------------------------===//
@@ -13,7 +13,7 @@
 #include "duckdb/common/file_buffer.hpp"
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/common/typedefs.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 
 namespace duckdb {
 
@@ -23,26 +23,27 @@ struct EvictionQueue;
 struct BufferEvictionNode {
 	BufferEvictionNode() {
 	}
-	BufferEvictionNode(weak_ptr<BlockHandle> handle_p, idx_t eviction_seq_num);
+	BufferEvictionNode(weak_ptr<FileBlockHandle> handle_p, idx_t eviction_seq_num);
 
-	weak_ptr<BlockHandle> handle;
+	weak_ptr<FileBlockHandle> handle;
 	idx_t handle_sequence_number;
 
-	bool CanUnload(BlockHandle &handle_p);
-	shared_ptr<BlockHandle> TryGetBlockHandle();
+	bool CanUnload(FileBlockHandle &handle_p);
+	shared_ptr<FileBlockHandle> TryGetFileBlockHandle();
 };
 
-//! The BufferPool is in charge of handling memory management for one or more databases. It defines memory limits
+//! The FileBufferPool is in charge of handling memory management for one or more databases. It defines memory limits
 //! and implements priority eviction among all users of the pool.
-class BufferPool {
-	friend class BlockHandle;
+class FileBufferPool {
+	friend class FileBlockHandle;
 	friend class BlockManager;
 	friend class BufferManager;
 	friend class StandardBufferManager;
 
 public:
-	BufferPool(idx_t maximum_memory, bool track_eviction_timestamps, idx_t allocator_bulk_deallocation_flush_threshold);
-	virtual ~BufferPool();
+	FileBufferPool(idx_t maximum_memory, bool track_eviction_timestamps,
+	               idx_t allocator_bulk_deallocation_flush_threshold);
+	virtual ~FileBufferPool();
 
 	//! Set a new memory limit to the buffer pool, throws an exception if the new limit is too low and not enough
 	//! blocks can be evicted
@@ -68,10 +69,10 @@ protected:
 	//! If the "buffer" argument is specified AND the system can find a buffer to re-use for the given allocation size
 	//! "buffer" will be made to point to the re-usable memory. Note that this is not guaranteed.
 	//! Returns a pair. result.first indicates if eviction was successful. result.second contains the
-	//! reservation handle, which can be moved to the BlockHandle that will own the reservation.
+	//! reservation handle, which can be moved to the FileBlockHandle that will own the reservation.
 	struct EvictionResult {
 		bool success;
-		TempBufferPoolReservation reservation;
+		TempFileBufferPoolReservation reservation;
 	};
 	virtual EvictionResult EvictBlocks(MemoryTag tag, idx_t extra_memory, idx_t memory_limit,
 	                                   unique_ptr<FileBuffer> *buffer = nullptr);
@@ -82,14 +83,14 @@ protected:
 	idx_t PurgeAgedBlocks(uint32_t max_age_sec);
 	idx_t PurgeAgedBlocksInternal(EvictionQueue &queue, uint32_t max_age_sec, int64_t now, int64_t limit);
 	//! Garbage collect dead nodes in the eviction queue.
-	void PurgeQueue(const BlockHandle &handle);
+	void PurgeQueue(const FileBlockHandle &handle);
 	//! Add a buffer handle to the eviction queue. Returns true, if the queue is
 	//! ready to be purged, and false otherwise.
-	bool AddToEvictionQueue(shared_ptr<BlockHandle> &handle);
+	bool AddToEvictionQueue(shared_ptr<FileBlockHandle> &handle);
 	//! Gets the eviction queue for the specified type
-	EvictionQueue &GetEvictionQueueForBlockHandle(const BlockHandle &handle);
+	EvictionQueue &GetEvictionQueueForFileBlockHandle(const FileBlockHandle &handle);
 	//! Increments the dead nodes for the queue with specified type
-	void IncrementDeadNodes(const BlockHandle &handle);
+	void IncrementDeadNodes(const FileBlockHandle &handle);
 
 	//! How many eviction queues we have for the different DBBufferTypes
 	static constexpr idx_t BLOCK_QUEUE_SIZE = 1;

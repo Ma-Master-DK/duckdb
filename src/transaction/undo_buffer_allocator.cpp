@@ -29,7 +29,7 @@ UndoBufferAllocator::UndoBufferAllocator(BufferManager &buffer_manager) : buffer
 
 UndoBufferReference UndoBufferAllocator::Allocate(idx_t alloc_len) {
 	D_ASSERT(!head || head->position <= head->capacity);
-	BufferHandle handle;
+	FileBufferHandle handle;
 	if (!head || head->position + alloc_len > head->capacity) {
 		// no space in current head - allocate a new block
 		auto block_size = buffer_manager.GetBlockSize();
@@ -49,7 +49,7 @@ UndoBufferReference UndoBufferAllocator::Allocate(idx_t alloc_len) {
 			handle = buffer_manager.Pin(entry->block);
 		} else {
 			handle = buffer_manager.Allocate(MemoryTag::TRANSACTION, capacity, false);
-			entry->block = handle.GetBlockHandle();
+			entry->block = handle.GetFileBlockHandle();
 		}
 		entry->capacity = capacity;
 		entry->position = 0;

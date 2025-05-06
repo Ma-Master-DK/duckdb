@@ -22,7 +22,7 @@
 namespace duckdb {
 
 class BufferManager;
-class BufferHandle;
+class FileBufferHandle;
 class ColumnDataCollection;
 struct ColumnDataAppendState;
 struct ClientConfig;

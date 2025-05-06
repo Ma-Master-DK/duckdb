@@ -12,14 +12,14 @@
 #include "duckdb/storage/file_block.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/common/set.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 
 namespace duckdb {
 class DatabaseInstance;
 struct MetadataBlockInfo;
 
 struct MetadataBlock {
-	shared_ptr<BlockHandle> block;
+	shared_ptr<FileBlockHandle> block;
 	block_id_t block_id;
 	vector<uint8_t> free_blocks;
 
@@ -37,7 +37,7 @@ struct MetadataPointer {
 
 struct MetadataHandle {
 	MetadataPointer pointer;
-	BufferHandle handle;
+	FileBufferHandle handle;
 };
 
 class MetadataManager {
@@ -66,7 +66,7 @@ public:
 	void ClearModifiedBlocks(const vector<MetaBlockPointer> &pointers);
 
 	vector<MetadataBlockInfo> GetMetadataInfo() const;
-	vector<shared_ptr<BlockHandle>> GetBlocks() const;
+	vector<shared_ptr<FileBlockHandle>> GetBlocks() const;
 	idx_t BlockCount();
 
 	void Write(WriteStream &sink);

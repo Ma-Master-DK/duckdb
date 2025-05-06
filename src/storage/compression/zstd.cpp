@@ -255,16 +255,16 @@ public:
 		out_buffer.size = remaining_space;
 	}
 
-	void SetCurrentBuffer(BufferHandle &handle) {
+	void SetCurrentBuffer(FileBufferHandle &handle) {
 		current_buffer = &handle;
 		current_buffer_ptr = handle.Ptr();
 	}
 
-	BufferHandle &GetExtraPageBuffer(block_id_t current_block_id) {
+	FileBufferHandle &GetExtraPageBuffer(block_id_t current_block_id) {
 		auto &block_manager = partial_block_manager.GetBlockManager();
 		auto &buffer_manager = block_manager.buffer_manager;
 
-		optional_ptr<BufferHandle> to_use;
+		optional_ptr<FileBufferHandle> to_use;
 
 		if (in_vector) {
 			// Currently in a Vector, we have to be mindful of the buffer that the string_lengths lives on
@@ -466,7 +466,7 @@ public:
 		return new_id;
 	}
 
-	void FlushPage(BufferHandle &buffer, block_id_t block_id) {
+	void FlushPage(FileBufferHandle &buffer, block_id_t block_id) {
 		if (block_id == INVALID_BLOCK) {
 			return;
 		}
@@ -573,16 +573,16 @@ public:
 	//! The vectors to store in a segment (not the last one)
 	idx_t vectors_per_segment = 0;
 	unique_ptr<ColumnSegment> segment;
-	BufferHandle segment_handle;
+	FileBufferHandle segment_handle;
 
 	// Non-segment buffers
-	BufferHandle extra_pages[2];
+	FileBufferHandle extra_pages[2];
 	block_id_t block_id = INVALID_BLOCK;
 
 	// Current block state
-	optional_ptr<BufferHandle> current_buffer;
+	optional_ptr<FileBufferHandle> current_buffer;
 	//! The buffer that contains the vector lengths
-	optional_ptr<BufferHandle> vector_lengths_buffer;
+	optional_ptr<FileBufferHandle> vector_lengths_buffer;
 	data_ptr_t current_buffer_ptr;
 
 	//===--------------------------------------------------------------------===//
@@ -669,7 +669,7 @@ public:
 	//! The metadata of the vector
 	ZSTDVectorScanMetadata metadata;
 	//! The (pinned) buffer handle(s) for this vectors data
-	vector<BufferHandle> buffer_handles;
+	vector<FileBufferHandle> buffer_handles;
 	//! The current pointer at which we're reading the vectors data
 	data_ptr_t current_buffer_ptr;
 	//! The (uncompressed) string lengths for this vector
@@ -742,7 +742,7 @@ public:
 		                               /* count = */ value_count};
 	}
 
-	shared_ptr<BlockHandle> LoadPage(block_id_t block_id) {
+	shared_ptr<FileBlockHandle> LoadPage(block_id_t block_id) {
 		return state.GetHandle(block_manager, block_id);
 	}
 
@@ -939,7 +939,7 @@ public:
 	duckdb_zstd::ZSTD_DCtx *decompression_context = nullptr;
 
 	idx_t segment_block_offset;
-	BufferHandle segment_handle;
+	FileBufferHandle segment_handle;
 
 	//===--------------------------------------------------------------------===//
 	// Vector metadata

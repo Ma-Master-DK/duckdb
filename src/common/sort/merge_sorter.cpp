@@ -424,7 +424,7 @@ void MergeSorter::MergeData(SortedData &result_data, SortedData &l_data, SortedD
 	data_ptr_t result_data_ptr = result_data_handle.Ptr() + result_data_block->count * row_width;
 	// Result heap to write to (if needed)
 	RowDataBlock *result_heap_block = nullptr;
-	BufferHandle result_heap_handle;
+	FileBufferHandle result_heap_handle;
 	data_ptr_t result_heap_ptr;
 	if (!layout.AllConstant() && state.external) {
 		result_heap_block = result_data.heap_blocks.back().get();
@@ -620,7 +620,7 @@ void MergeSorter::FlushRows(data_ptr_t &source_ptr, idx_t &source_entry_idx, con
 void MergeSorter::FlushBlobs(const RowLayout &layout, const idx_t &source_count, data_ptr_t &source_data_ptr,
                              idx_t &source_entry_idx, data_ptr_t &source_heap_ptr, RowDataBlock &target_data_block,
                              data_ptr_t &target_data_ptr, RowDataBlock &target_heap_block,
-                             BufferHandle &target_heap_handle, data_ptr_t &target_heap_ptr, idx_t &copied,
+                             FileBufferHandle &target_heap_handle, data_ptr_t &target_heap_ptr, idx_t &copied,
                              const idx_t &count) {
 	const idx_t row_width = layout.GetRowWidth();
 	const idx_t heap_pointer_offset = layout.GetHeapOffset();

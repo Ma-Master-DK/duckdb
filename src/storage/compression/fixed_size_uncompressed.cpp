@@ -134,7 +134,7 @@ void UncompressedFunctions::FinalizeCompress(CompressionState &state_p) {
 // Scan
 //===--------------------------------------------------------------------===//
 struct FixedSizeScanState : public SegmentScanState {
-	BufferHandle handle;
+	FileBufferHandle handle;
 };
 
 unique_ptr<SegmentScanState> FixedSizeInitScan(ColumnSegment &segment) {

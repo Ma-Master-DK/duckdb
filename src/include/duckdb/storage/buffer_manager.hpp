@@ -9,7 +9,7 @@
 #pragma once
 
 #include "duckdb/storage/buffer_manager.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/enums/memory_tag.hpp"
@@ -19,12 +19,12 @@
 namespace duckdb {
 
 class Allocator;
-class BufferPool;
+class FileBufferPool;
 class TemporaryMemoryManager;
 
 class BufferManager {
-	friend class BufferHandle;
-	friend class BlockHandle;
+	friend class FileBufferHandle;
+	friend class FileBlockHandle;
 	friend class BlockManager;
 
 public:
@@ -34,13 +34,13 @@ public:
 	}
 
 public:
-	virtual BufferHandle Allocate(MemoryTag tag, idx_t block_size, bool can_destroy = true) = 0;
+	virtual FileBufferHandle Allocate(MemoryTag tag, idx_t block_size, bool can_destroy = true) = 0;
 	//! Reallocate an in-memory buffer that is pinned.
-	virtual void ReAllocate(shared_ptr<BlockHandle> &handle, idx_t block_size) = 0;
-	virtual BufferHandle Pin(shared_ptr<BlockHandle> &handle) = 0;
+	virtual void ReAllocate(shared_ptr<FileBlockHandle> &handle, idx_t block_size) = 0;
+	virtual FileBufferHandle Pin(shared_ptr<FileBlockHandle> &handle) = 0;
 	//! Prefetch a series of blocks. Note that this is a performance suggestion.
-	virtual void Prefetch(vector<shared_ptr<BlockHandle>> &handles) = 0;
-	virtual void Unpin(shared_ptr<BlockHandle> &handle) = 0;
+	virtual void Prefetch(vector<shared_ptr<FileBlockHandle>> &handles) = 0;
+	virtual void Unpin(shared_ptr<FileBlockHandle> &handle) = 0;
 
 	//! Returns the currently allocated memory
 	virtual idx_t GetUsedMemory() const = 0;
@@ -56,10 +56,10 @@ public:
 	virtual idx_t GetBlockSize() const = 0;
 
 	//! Returns a new block of transient memory.
-	virtual shared_ptr<BlockHandle> RegisterTransientMemory(const idx_t size, const idx_t block_size);
+	virtual shared_ptr<FileBlockHandle> RegisterTransientMemory(const idx_t size, const idx_t block_size);
 	//! Returns a new block of memory that is smaller than the block size setting.
-	virtual shared_ptr<BlockHandle> RegisterSmallMemory(const idx_t size);
-	virtual shared_ptr<BlockHandle> RegisterSmallMemory(MemoryTag tag, const idx_t size);
+	virtual shared_ptr<FileBlockHandle> RegisterSmallMemory(const idx_t size);
+	virtual shared_ptr<FileBlockHandle> RegisterSmallMemory(MemoryTag tag, const idx_t size);
 
 	virtual DUCKDB_API Allocator &GetBufferAllocator();
 	virtual DUCKDB_API void ReserveMemory(idx_t size);
@@ -79,7 +79,7 @@ public:
 	virtual unique_ptr<FileBuffer> ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&source,
 	                                                      DBBufferType type = DBBufferType::MANAGED_BUFFER);
 	//! Get the underlying buffer pool responsible for managing the buffers
-	virtual BufferPool &GetBufferPool() const;
+	virtual FileBufferPool &GetFileBufferPool() const;
 
 	virtual DatabaseInstance &GetDatabase() = 0;
 	// Static methods
@@ -99,12 +99,12 @@ public:
 	virtual TemporaryMemoryManager &GetTemporaryMemoryManager();
 
 protected:
-	virtual void PurgeQueue(const BlockHandle &handle) = 0;
-	virtual void AddToEvictionQueue(shared_ptr<BlockHandle> &handle);
+	virtual void PurgeQueue(const FileBlockHandle &handle) = 0;
+	virtual void AddToEvictionQueue(shared_ptr<FileBlockHandle> &handle);
 	virtual void WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, FileBuffer &buffer);
-	virtual unique_ptr<FileBuffer> ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
+	virtual unique_ptr<FileBuffer> ReadTemporaryBuffer(MemoryTag tag, FileBlockHandle &block,
 	                                                   unique_ptr<FileBuffer> buffer);
-	virtual void DeleteTemporaryFile(BlockHandle &block);
+	virtual void DeleteTemporaryFile(FileBlockHandle &block);
 };
 
 } // namespace duckdb

@@ -12,21 +12,21 @@
 #include "duckdb/execution/operator/csv_scanner/csv_file_handle.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 #include "duckdb/storage/block_manager.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 
 namespace duckdb {
 
-class CSVBufferHandle {
+class CSVFileBufferHandle {
 public:
-	CSVBufferHandle(BufferHandle handle_p, idx_t actual_size_p, idx_t requested_size_p, const bool is_final_buffer_p,
-	                idx_t buffer_index_p)
+	CSVFileBufferHandle(FileBufferHandle handle_p, idx_t actual_size_p, idx_t requested_size_p,
+	                    const bool is_final_buffer_p, idx_t buffer_index_p)
 	    : handle(std::move(handle_p)), actual_size(actual_size_p), requested_size(requested_size_p),
 	      is_last_buffer(is_final_buffer_p), buffer_idx(buffer_index_p) {};
-	CSVBufferHandle() : actual_size(0), requested_size(0), is_last_buffer(false), buffer_idx(0) {};
-	~CSVBufferHandle() {
+	CSVFileBufferHandle() : actual_size(0), requested_size(0), is_last_buffer(false), buffer_idx(0) {};
+	~CSVFileBufferHandle() {
 	}
 	//! Handle created during allocation
-	BufferHandle handle;
+	FileBufferHandle handle;
 	const idx_t actual_size;
 	const idx_t requested_size;
 	const bool is_last_buffer;
@@ -65,7 +65,7 @@ public:
 	void Reload(CSVFileHandle &file_handle);
 	//! Wrapper for the Pin Function, if it can seek, it means that the buffer might have been destroyed, hence we must
 	//! Scan it from the disk file again.
-	shared_ptr<CSVBufferHandle> Pin(CSVFileHandle &file_handle, bool &has_seeked);
+	shared_ptr<CSVFileBufferHandle> Pin(CSVFileHandle &file_handle, bool &has_seeked);
 	//! Wrapper for unpin
 	void Unpin();
 	char *Ptr() {
@@ -96,7 +96,7 @@ private:
 	idx_t buffer_idx = 0;
 	//! -------- Allocated Block ---------//
 	//! Block created in allocation
-	shared_ptr<BlockHandle> block;
-	BufferHandle handle;
+	shared_ptr<FileBlockHandle> block;
+	FileBufferHandle handle;
 };
 } // namespace duckdb

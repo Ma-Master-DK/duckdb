@@ -4,7 +4,7 @@
 #include "duckdb/common/radix_partitioning.hpp"
 #include "duckdb/common/types/row/tuple_data_segment.hpp"
 #include "duckdb/common/types/row/tuple_data_states.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 
 namespace duckdb {
@@ -13,7 +13,7 @@ using ValidityBytes = TupleDataLayout::ValidityBytes;
 
 TupleDataBlock::TupleDataBlock(BufferManager &buffer_manager, idx_t capacity_p) : capacity(capacity_p), size(0) {
 	auto buffer_handle = buffer_manager.Allocate(MemoryTag::HASH_TABLE, capacity, false);
-	handle = buffer_handle.GetBlockHandle();
+	handle = buffer_handle.GetFileBlockHandle();
 }
 
 TupleDataBlock::TupleDataBlock(TupleDataBlock &&other) noexcept : capacity(0), size(0) {
@@ -447,9 +447,12 @@ void TupleDataAllocator::ReleaseOrStoreHandles(TupleDataPinState &pin_state, Tup
 	ReleaseOrStoreHandles(pin_state, segment, DUMMY_CHUNK, true);
 }
 
-void TupleDataAllocator::ReleaseOrStoreHandlesInternal(
-    TupleDataSegment &segment, unsafe_vector<BufferHandle> &pinned_handles, perfect_map_t<BufferHandle> &handles,
-    const perfect_set_t &block_ids, unsafe_vector<TupleDataBlock> &blocks, TupleDataPinProperties properties) {
+void TupleDataAllocator::ReleaseOrStoreHandlesInternal(TupleDataSegment &segment,
+                                                       unsafe_vector<FileBufferHandle> &pinned_handles,
+                                                       perfect_map_t<FileBufferHandle> &handles,
+                                                       const perfect_set_t &block_ids,
+                                                       unsafe_vector<TupleDataBlock> &blocks,
+                                                       TupleDataPinProperties properties) {
 	bool found_handle;
 	do {
 		found_handle = false;
@@ -489,7 +492,7 @@ void TupleDataAllocator::ReleaseOrStoreHandlesInternal(
 	} while (found_handle);
 }
 
-BufferHandle &TupleDataAllocator::PinRowBlock(TupleDataPinState &pin_state, const TupleDataChunkPart &part) {
+FileBufferHandle &TupleDataAllocator::PinRowBlock(TupleDataPinState &pin_state, const TupleDataChunkPart &part) {
 	const auto &row_block_index = part.row_block_index;
 	auto it = pin_state.row_handles.find(row_block_index);
 	if (it == pin_state.row_handles.end()) {
@@ -503,7 +506,7 @@ BufferHandle &TupleDataAllocator::PinRowBlock(TupleDataPinState &pin_state, cons
 	return it->second;
 }
 
-BufferHandle &TupleDataAllocator::PinHeapBlock(TupleDataPinState &pin_state, const TupleDataChunkPart &part) {
+FileBufferHandle &TupleDataAllocator::PinHeapBlock(TupleDataPinState &pin_state, const TupleDataChunkPart &part) {
 	const auto &heap_block_index = part.heap_block_index;
 	auto it = pin_state.heap_handles.find(heap_block_index);
 	if (it == pin_state.heap_handles.end()) {

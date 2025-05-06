@@ -2,8 +2,8 @@
 
 #include "duckdb/common/radix_partitioning.hpp"
 #include "duckdb/common/types/column/column_data_collection_segment.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
-#include "duckdb/storage/buffer/buffer_pool.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_pool.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 
 namespace duckdb {
@@ -57,9 +57,9 @@ ColumnDataAllocator::~ColumnDataAllocator() {
 	blocks.clear();
 }
 
-BufferHandle ColumnDataAllocator::Pin(uint32_t block_id) {
+FileBufferHandle ColumnDataAllocator::Pin(uint32_t block_id) {
 	D_ASSERT(type == ColumnDataAllocatorType::BUFFER_MANAGER_ALLOCATOR || type == ColumnDataAllocatorType::HYBRID);
-	shared_ptr<BlockHandle> handle;
+	shared_ptr<FileBlockHandle> handle;
 	if (shared) {
 		// we only need to grab the lock when accessing the vector, because vector access is not thread-safe:
 		// the vector can be resized by another thread while we try to access it
@@ -71,14 +71,14 @@ BufferHandle ColumnDataAllocator::Pin(uint32_t block_id) {
 	return alloc.buffer_manager->Pin(handle);
 }
 
-BufferHandle ColumnDataAllocator::AllocateBlock(idx_t size) {
+FileBufferHandle ColumnDataAllocator::AllocateBlock(idx_t size) {
 	D_ASSERT(type == ColumnDataAllocatorType::BUFFER_MANAGER_ALLOCATOR || type == ColumnDataAllocatorType::HYBRID);
 	auto max_size = MaxValue<idx_t>(size, GetBufferManager().GetBlockSize());
 	BlockMetaData data;
 	data.size = 0;
 	data.capacity = NumericCast<uint32_t>(max_size);
 	auto pin = alloc.buffer_manager->Allocate(MemoryTag::COLUMN_DATA, max_size, false);
-	data.handle = pin.GetBlockHandle();
+	data.handle = pin.GetFileBlockHandle();
 	blocks.push_back(std::move(data));
 	if (partition_index.IsValid()) { // Set the eviction queue index logarithmically using RadixBits
 		blocks.back().handle->SetEvictionQueueIndex(RadixPartitioning::RadixBits(partition_index.GetIndex()));

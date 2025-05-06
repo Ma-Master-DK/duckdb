@@ -17,7 +17,7 @@ struct VectorMetaData;
 
 struct BlockMetaData {
 	//! The underlying block handle
-	shared_ptr<BlockHandle> handle;
+	shared_ptr<FileBlockHandle> handle;
 	//! How much space is currently used within the block
 	uint32_t size;
 	//! How much space is available in the block
@@ -83,8 +83,8 @@ public:
 
 private:
 	void AllocateEmptyBlock(idx_t size);
-	BufferHandle AllocateBlock(idx_t size);
-	BufferHandle Pin(uint32_t block_id);
+	FileBufferHandle AllocateBlock(idx_t size);
+	FileBufferHandle Pin(uint32_t block_id);
 
 	bool HasBlocks() const {
 		return !blocks.empty();

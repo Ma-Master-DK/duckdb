@@ -86,7 +86,7 @@ public:
 
 	//! Pinned heap data (if sorting in memory)
 	vector<unique_ptr<RowDataBlock>> heap_blocks;
-	vector<BufferHandle> pinned_blocks;
+	vector<FileBufferHandle> pinned_blocks;
 
 	//! Capacity (number of rows) used to initialize blocks
 	idx_t block_capacity;
@@ -202,7 +202,7 @@ private:
 	//! Flushes blob rows and accompanying heap
 	void FlushBlobs(const RowLayout &layout, const idx_t &source_count, data_ptr_t &source_data_ptr,
 	                idx_t &source_entry_idx, data_ptr_t &source_heap_ptr, RowDataBlock &target_data_block,
-	                data_ptr_t &target_data_ptr, RowDataBlock &target_heap_block, BufferHandle &target_heap_handle,
+	                data_ptr_t &target_data_ptr, RowDataBlock &target_heap_block, FileBufferHandle &target_heap_handle,
 	                data_ptr_t &target_heap_ptr, idx_t &copied, const idx_t &count);
 };
 

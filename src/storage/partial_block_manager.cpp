@@ -7,7 +7,7 @@ namespace duckdb {
 //===--------------------------------------------------------------------===//
 
 PartialBlock::PartialBlock(PartialBlockState state, BlockManager &block_manager,
-                           const shared_ptr<BlockHandle> &block_handle)
+                           const shared_ptr<FileBlockHandle> &block_handle)
     : state(state), block_manager(block_manager), block_handle(block_handle) {
 }
 

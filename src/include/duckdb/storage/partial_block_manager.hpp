@@ -44,7 +44,7 @@ struct PartialBlockState {
 };
 
 struct PartialBlock {
-	PartialBlock(PartialBlockState state, BlockManager &block_manager, const shared_ptr<BlockHandle> &block_handle);
+	PartialBlock(PartialBlockState state, BlockManager &block_manager, const shared_ptr<FileBlockHandle> &block_handle);
 	virtual ~PartialBlock() {
 	}
 
@@ -55,7 +55,7 @@ struct PartialBlock {
 	//! The block manager of the partial block manager
 	BlockManager &block_manager;
 	//! The block handle of the underlying block that this partial block writes to
-	shared_ptr<BlockHandle> block_handle;
+	shared_ptr<FileBlockHandle> block_handle;
 
 public:
 	//! Add regions that need zero-initialization to avoid leaking memory

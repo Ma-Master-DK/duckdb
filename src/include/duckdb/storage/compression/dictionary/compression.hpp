@@ -42,7 +42,7 @@ public:
 
 	// State regarding current segment
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle current_handle;
+	FileBufferHandle current_handle;
 	StringDictionaryContainer current_dictionary;
 	data_ptr_t current_end_ptr;
 

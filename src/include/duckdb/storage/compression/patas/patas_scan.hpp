@@ -100,7 +100,7 @@ public:
 		metadata_ptr = segment_data + metadata_offset;
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 	data_ptr_t metadata_ptr;
 	data_ptr_t segment_data;
 	idx_t total_value_count = 0;

@@ -48,7 +48,7 @@ public:
 	DBConfig config;
 
 public:
-	BufferPool &GetBufferPool() const;
+	FileBufferPool &GetFileBufferPool() const;
 	DUCKDB_API SecretManager &GetSecretManager();
 	DUCKDB_API BufferManager &GetBufferManager();
 	DUCKDB_API const BufferManager &GetBufferManager() const;

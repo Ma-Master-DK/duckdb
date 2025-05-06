@@ -17,8 +17,8 @@
 #include "duckdb/common/unordered_map.hpp"
 
 namespace duckdb {
-class BlockHandle;
-class BufferHandle;
+class FileBlockHandle;
+class FileBufferHandle;
 class BufferManager;
 class ClientContext;
 class DatabaseInstance;
@@ -111,15 +111,15 @@ public:
 	virtual void Truncate();
 
 	//! Register a block with the given block id in the base file
-	shared_ptr<BlockHandle> RegisterBlock(block_id_t block_id);
+	shared_ptr<FileBlockHandle> RegisterBlock(block_id_t block_id);
 
 	//! Convert an existing in-memory buffer into a persistent disk-backed block
-	shared_ptr<BlockHandle> ConvertToPersistent(block_id_t block_id, shared_ptr<BlockHandle> old_block,
+	shared_ptr<FileBlockHandle> ConvertToPersistent(block_id_t block_id, shared_ptr<FileBlockHandle> old_block,
 
-	                                            BufferHandle old_handle);
-	shared_ptr<BlockHandle> ConvertToPersistent(block_id_t block_id, shared_ptr<BlockHandle> old_block);
+	                                                FileBufferHandle old_handle);
+	shared_ptr<FileBlockHandle> ConvertToPersistent(block_id_t block_id, shared_ptr<FileBlockHandle> old_block);
 
-	void UnregisterBlock(BlockHandle &block);
+	void UnregisterBlock(FileBlockHandle &block);
 
 	//! UnregisterBlock, only accepts non-temporary block ids
 	void UnregisterBlock(block_id_t id);
@@ -160,8 +160,8 @@ private:
 	//! The lock for the set of blocks
 	mutex blocks_lock;
 
-	//! A mapping of block id -> BlockHandle
-	unordered_map<block_id_t, weak_ptr<BlockHandle>> blocks;
+	//! A mapping of block id -> FileBlockHandle
+	unordered_map<block_id_t, weak_ptr<FileBlockHandle>> blocks;
 
 	//! The metadata manager
 	unique_ptr<MetadataManager> metadata_manager;

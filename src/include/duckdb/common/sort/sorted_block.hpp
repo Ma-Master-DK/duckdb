@@ -11,7 +11,7 @@
 #include "duckdb/common/sort/comparators.hpp"
 #include "duckdb/common/types/row/row_data_collection_scanner.hpp"
 #include "duckdb/common/types/row/row_layout.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 
 namespace duckdb {
 
@@ -118,13 +118,13 @@ public:
 	idx_t block_idx;
 	idx_t entry_idx;
 
-	BufferHandle radix_handle;
+	FileBufferHandle radix_handle;
 
-	BufferHandle blob_sorting_data_handle;
-	BufferHandle blob_sorting_heap_handle;
+	FileBufferHandle blob_sorting_data_handle;
+	FileBufferHandle blob_sorting_heap_handle;
 
-	BufferHandle payload_data_handle;
-	BufferHandle payload_heap_handle;
+	FileBufferHandle payload_data_handle;
+	FileBufferHandle payload_heap_handle;
 };
 
 //! Used to scan the data into DataChunks after sorting

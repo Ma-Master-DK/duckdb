@@ -131,7 +131,7 @@ void RowOperations::Scatter(DataChunk &columns, UnifiedVectorFormat col_data[], 
 	auto &types = layout.GetTypes();
 
 	// Compute the entry size of the variable size columns
-	vector<BufferHandle> handles;
+	vector<FileBufferHandle> handles;
 	data_ptr_t data_locations[STANDARD_VECTOR_SIZE];
 	if (!layout.AllConstant()) {
 		idx_t entry_sizes[STANDARD_VECTOR_SIZE];

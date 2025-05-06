@@ -10,7 +10,7 @@ namespace duckdb {
 //===--------------------------------------------------------------------===//
 
 PartialBlockForIndex::PartialBlockForIndex(PartialBlockState state, BlockManager &block_manager,
-                                           const shared_ptr<BlockHandle> &block_handle)
+                                           const shared_ptr<FileBlockHandle> &block_handle)
     : PartialBlock(state, block_manager, block_handle) {
 }
 
@@ -41,7 +41,7 @@ FixedSizeBuffer::FixedSizeBuffer(BlockManager &block_manager)
 
 	auto &buffer_manager = block_manager.buffer_manager;
 	buffer_handle = buffer_manager.Allocate(MemoryTag::ART_INDEX, block_manager.GetBlockSize(), false);
-	block_handle = buffer_handle.GetBlockHandle();
+	block_handle = buffer_handle.GetFileBlockHandle();
 }
 
 FixedSizeBuffer::FixedSizeBuffer(BlockManager &block_manager, const idx_t segment_count, const idx_t allocation_size,
@@ -142,9 +142,9 @@ void FixedSizeBuffer::Pin() {
 	buffer_handle = buffer_manager.Pin(block_handle);
 
 	// Copy the (partial) data into a new (not yet disk-backed) buffer handle.
-	shared_ptr<BlockHandle> new_block_handle;
+	shared_ptr<FileBlockHandle> new_block_handle;
 	auto new_buffer_handle = buffer_manager.Allocate(MemoryTag::ART_INDEX, block_manager.GetBlockSize(), false);
-	new_block_handle = new_buffer_handle.GetBlockHandle();
+	new_block_handle = new_buffer_handle.GetFileBlockHandle();
 	memcpy(new_buffer_handle.Ptr(), buffer_handle.Ptr() + block_pointer.offset, allocation_size);
 
 	buffer_handle = std::move(new_buffer_handle);

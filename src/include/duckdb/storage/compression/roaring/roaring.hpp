@@ -355,7 +355,7 @@ public:
 	ColumnDataCheckpointData &checkpoint_data;
 	CompressionFunction &function;
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle handle;
+	FileBufferHandle handle;
 
 	// Ptr to next free spot in segment;
 	data_ptr_t data_ptr;
@@ -604,7 +604,7 @@ public:
 	void Skip(ContainerScanState &scan_state, idx_t skip_count);
 
 public:
-	BufferHandle handle;
+	FileBufferHandle handle;
 	ColumnSegment &segment;
 	unique_ptr<ContainerScanState> current_container;
 	data_ptr_t data_ptr;

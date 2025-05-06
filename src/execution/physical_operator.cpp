@@ -10,7 +10,7 @@
 #include "duckdb/parallel/meta_pipeline.hpp"
 #include "duckdb/parallel/pipeline.hpp"
 #include "duckdb/parallel/thread_context.hpp"
-#include "duckdb/storage/buffer/buffer_pool.hpp"
+#include "duckdb/storage/buffer/file_buffer_pool.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 
 namespace duckdb {

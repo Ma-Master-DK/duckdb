@@ -320,9 +320,9 @@ void PhysicalRangeJoin::ProjectResult(DataChunk &chunk, DataChunk &result) const
 	result.SetCardinality(chunk);
 }
 
-BufferHandle PhysicalRangeJoin::SliceSortedPayload(DataChunk &payload, GlobalSortState &state, const idx_t block_idx,
-                                                   const SelectionVector &result, const idx_t result_count,
-                                                   const idx_t left_cols) {
+FileBufferHandle PhysicalRangeJoin::SliceSortedPayload(DataChunk &payload, GlobalSortState &state,
+                                                       const idx_t block_idx, const SelectionVector &result,
+                                                       const idx_t result_count, const idx_t left_cols) {
 	// There should only be one sorted block if they have been sorted
 	D_ASSERT(state.sorted_blocks.size() == 1);
 	SBScanState read_state(state.buffer_manager, state);

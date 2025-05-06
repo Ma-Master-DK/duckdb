@@ -28,8 +28,8 @@ enum class TupleDataPinProperties : uint8_t {
 };
 
 struct TupleDataPinState {
-	perfect_map_t<BufferHandle> row_handles;
-	perfect_map_t<BufferHandle> heap_handles;
+	perfect_map_t<FileBufferHandle> row_handles;
+	perfect_map_t<FileBufferHandle> heap_handles;
 	TupleDataPinProperties properties = TupleDataPinProperties::INVALID;
 };
 

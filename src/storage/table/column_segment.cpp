@@ -32,7 +32,7 @@ unique_ptr<ColumnSegment> ColumnSegment::CreatePersistentSegment(DatabaseInstanc
 
 	auto &config = DBConfig::GetConfig(db);
 	optional_ptr<CompressionFunction> function;
-	shared_ptr<BlockHandle> block;
+	shared_ptr<FileBlockHandle> block;
 
 	if (block_id == INVALID_BLOCK) {
 		function = config.GetCompressionFunction(CompressionType::COMPRESSION_CONSTANT, type.InternalType());
@@ -61,7 +61,7 @@ unique_ptr<ColumnSegment> ColumnSegment::CreateTransientSegment(DatabaseInstance
 //===--------------------------------------------------------------------===//
 // Construct/Destruct
 //===--------------------------------------------------------------------===//
-ColumnSegment::ColumnSegment(DatabaseInstance &db, shared_ptr<BlockHandle> block_p, const LogicalType &type,
+ColumnSegment::ColumnSegment(DatabaseInstance &db, shared_ptr<FileBlockHandle> block_p, const LogicalType &type,
                              const ColumnSegmentType segment_type, const idx_t start, const idx_t count,
                              CompressionFunction &function_p, BaseStatistics statistics, const block_id_t block_id_p,
                              const idx_t offset, const idx_t segment_size_p,
@@ -176,7 +176,7 @@ void ColumnSegment::Resize(idx_t new_size) {
 	auto &buffer_manager = BufferManager::GetBufferManager(db);
 	auto old_handle = buffer_manager.Pin(block);
 	auto new_handle = buffer_manager.Allocate(MemoryTag::IN_MEMORY_TABLE, new_size);
-	auto new_block = new_handle.GetBlockHandle();
+	auto new_block = new_handle.GetFileBlockHandle();
 	memcpy(new_handle.Ptr(), old_handle.Ptr(), segment_size);
 
 	this->block_id = new_block->BlockId();
@@ -245,7 +245,7 @@ void ColumnSegment::ConvertToPersistent(optional_ptr<BlockManager> block_manager
 	}
 }
 
-void ColumnSegment::MarkAsPersistent(shared_ptr<BlockHandle> block_p, uint32_t offset_p) {
+void ColumnSegment::MarkAsPersistent(shared_ptr<FileBlockHandle> block_p, uint32_t offset_p) {
 	D_ASSERT(segment_type == ColumnSegmentType::TRANSIENT);
 	segment_type = ColumnSegmentType::PERSISTENT;
 

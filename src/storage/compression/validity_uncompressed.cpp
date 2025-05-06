@@ -203,7 +203,7 @@ idx_t ValidityFinalAnalyze(AnalyzeState &state_p) {
 // Scan
 //===--------------------------------------------------------------------===//
 struct ValidityScanState : public SegmentScanState {
-	BufferHandle handle;
+	FileBufferHandle handle;
 	block_id_t block_id;
 };
 

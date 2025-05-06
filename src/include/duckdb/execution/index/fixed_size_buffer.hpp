@@ -9,8 +9,8 @@
 #pragma once
 
 #include "duckdb/storage/partial_block_manager.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 #include "duckdb/storage/block_manager.hpp"
 
 namespace duckdb {
@@ -21,7 +21,7 @@ class MetadataWriter;
 struct PartialBlockForIndex : public PartialBlock {
 public:
 	PartialBlockForIndex(PartialBlockState state, BlockManager &block_manager,
-	                     const shared_ptr<BlockHandle> &block_handle);
+	                     const shared_ptr<FileBlockHandle> &block_handle);
 	~PartialBlockForIndex() override {};
 
 public:
@@ -103,9 +103,9 @@ private:
 	//! Partial block id and offset
 	BlockPointer block_pointer;
 	//! The buffer handle of the in-memory buffer
-	BufferHandle buffer_handle;
+	FileBufferHandle buffer_handle;
 	//! The block handle of the on-disk buffer
-	shared_ptr<BlockHandle> block_handle;
+	shared_ptr<FileBlockHandle> block_handle;
 	//! The lock for this fixed size buffer handle
 	mutex lock;
 };

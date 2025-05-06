@@ -44,7 +44,7 @@ public:
 	ColumnDataCheckpointData &checkpoint_data;
 	CompressionFunction &function;
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle handle;
+	FileBufferHandle handle;
 
 	idx_t vector_idx = 0;
 	idx_t nulls_idx = 0;

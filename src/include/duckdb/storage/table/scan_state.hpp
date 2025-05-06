@@ -10,7 +10,7 @@
 
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/map.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 #include "duckdb/storage/storage_lock.hpp"
 #include "duckdb/common/enums/scan_options.hpp"
 #include "duckdb/common/random_engine.hpp"
@@ -75,7 +75,7 @@ struct IndexScanState {
 	}
 };
 
-typedef unordered_map<block_id_t, BufferHandle> buffer_handle_set_t;
+typedef unordered_map<block_id_t, FileBufferHandle> buffer_handle_set_t;
 
 struct ColumnScanState {
 	//! The column segment that is currently being scanned
@@ -120,7 +120,7 @@ struct ColumnFetchState {
 	//! Any child states of the fetch
 	vector<unique_ptr<ColumnFetchState>> child_states;
 
-	BufferHandle &GetOrInsertHandle(ColumnSegment &segment);
+	FileBufferHandle &GetOrInsertHandle(ColumnSegment &segment);
 };
 
 struct ScanFilter {
@@ -295,9 +295,9 @@ struct ParallelTableScanState {
 struct PrefetchState {
 	~PrefetchState();
 
-	void AddBlock(shared_ptr<BlockHandle> block);
+	void AddBlock(shared_ptr<FileBlockHandle> block);
 
-	vector<shared_ptr<BlockHandle>> blocks;
+	vector<shared_ptr<FileBlockHandle>> blocks;
 };
 
 class CreateIndexScanState : public TableScanState {

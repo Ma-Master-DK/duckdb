@@ -12,11 +12,11 @@
 #include "duckdb/common/types/selection_vector.hpp"
 #include "duckdb/common/types/string_heap.hpp"
 #include "duckdb/common/types/string_type.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 
 namespace duckdb {
 
-class BufferHandle;
+class FileBufferHandle;
 class VectorBuffer;
 class Vector;
 
@@ -334,11 +334,11 @@ private:
 //! The ManagedVectorBuffer holds a buffer handle
 class ManagedVectorBuffer : public VectorBuffer {
 public:
-	explicit ManagedVectorBuffer(BufferHandle handle);
+	explicit ManagedVectorBuffer(FileBufferHandle handle);
 	~ManagedVectorBuffer() override;
 
 private:
-	BufferHandle handle;
+	FileBufferHandle handle;
 };
 
 } // namespace duckdb

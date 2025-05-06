@@ -58,8 +58,8 @@ struct FSSTStorage {
 	static void Select(ColumnSegment &segment, ColumnScanState &state, idx_t vector_count, Vector &result,
 	                   const SelectionVector &sel, idx_t sel_count);
 
-	static void SetDictionary(ColumnSegment &segment, BufferHandle &handle, StringDictionaryContainer container);
-	static StringDictionaryContainer GetDictionary(ColumnSegment &segment, BufferHandle &handle);
+	static void SetDictionary(ColumnSegment &segment, FileBufferHandle &handle, StringDictionaryContainer container);
+	static StringDictionaryContainer GetDictionary(ColumnSegment &segment, FileBufferHandle &handle);
 
 	static char *FetchStringPointer(StringDictionaryContainer dict, data_ptr_t baseptr, int32_t dict_offset);
 	static bp_delta_offsets_t CalculateBpDeltaOffsets(int64_t last_known_row, idx_t start, idx_t scan_count);
@@ -387,7 +387,7 @@ public:
 
 	// State regarding current segment
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle current_handle;
+	FileBufferHandle current_handle;
 	StringDictionaryContainer current_dictionary;
 	data_ptr_t current_end_ptr;
 
@@ -782,13 +782,13 @@ bool FSSTFun::TypeIsSupported(const PhysicalType physical_type) {
 //===--------------------------------------------------------------------===//
 // Helper Functions
 //===--------------------------------------------------------------------===//
-void FSSTStorage::SetDictionary(ColumnSegment &segment, BufferHandle &handle, StringDictionaryContainer container) {
+void FSSTStorage::SetDictionary(ColumnSegment &segment, FileBufferHandle &handle, StringDictionaryContainer container) {
 	auto header_ptr = reinterpret_cast<fsst_compression_header_t *>(handle.Ptr() + segment.GetBlockOffset());
 	Store<uint32_t>(container.size, data_ptr_cast(&header_ptr->dict_size));
 	Store<uint32_t>(container.end, data_ptr_cast(&header_ptr->dict_end));
 }
 
-StringDictionaryContainer FSSTStorage::GetDictionary(ColumnSegment &segment, BufferHandle &handle) {
+StringDictionaryContainer FSSTStorage::GetDictionary(ColumnSegment &segment, FileBufferHandle &handle) {
 	auto header_ptr = reinterpret_cast<fsst_compression_header_t *>(handle.Ptr() + segment.GetBlockOffset());
 	StringDictionaryContainer container;
 	container.size = Load<uint32_t>(data_ptr_cast(&header_ptr->dict_size));

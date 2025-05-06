@@ -49,7 +49,7 @@ bool CSVBufferManager::ReadNextAndCacheIt() {
 	return false;
 }
 
-shared_ptr<CSVBufferHandle> CSVBufferManager::GetBuffer(const idx_t pos) {
+shared_ptr<CSVFileBufferHandle> CSVBufferManager::GetBuffer(const idx_t pos) {
 	lock_guard<mutex> parallel_lock(main_mutex);
 	if (pos == 0 && done && cached_buffers.empty()) {
 		if (is_pipe) {

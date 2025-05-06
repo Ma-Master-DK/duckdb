@@ -34,7 +34,7 @@ struct UndoBufferProperties {
 class UndoBuffer {
 public:
 	struct IteratorState {
-		BufferHandle handle;
+		FileBufferHandle handle;
 		optional_ptr<UndoBufferEntry> current;
 		data_ptr_t start;
 		data_ptr_t end;

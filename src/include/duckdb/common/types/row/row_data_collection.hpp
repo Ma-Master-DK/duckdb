@@ -11,7 +11,7 @@
 #include "duckdb/common/common.hpp"
 #include "duckdb/common/types/vector.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 
 namespace duckdb {
 
@@ -21,14 +21,14 @@ public:
 	    : capacity(capacity), entry_size(entry_size), count(0), byte_offset(0) {
 		auto size = MaxValue<idx_t>(buffer_manager.GetBlockSize(), capacity * entry_size);
 		auto buffer_handle = buffer_manager.Allocate(tag, size, false);
-		block = buffer_handle.GetBlockHandle();
+		block = buffer_handle.GetFileBlockHandle();
 		D_ASSERT(BufferManager::GetAllocSize(size) == block->GetMemoryUsage());
 	}
 
 	explicit RowDataBlock(idx_t entry_size) : entry_size(entry_size) {
 	}
 	//! The buffer block handle
-	shared_ptr<BlockHandle> block;
+	shared_ptr<FileBlockHandle> block;
 	//! Capacity (number of entries) and entry size that fit in this block
 	idx_t capacity;
 	const idx_t entry_size;
@@ -78,16 +78,16 @@ public:
 	//! The blocks holding the main data
 	vector<unique_ptr<RowDataBlock>> blocks;
 	//! The blocks that this collection currently has pinned
-	vector<BufferHandle> pinned_blocks;
+	vector<FileBufferHandle> pinned_blocks;
 	//! Whether the blocks should stay pinned (necessary for e.g. a heap)
 	const bool keep_pinned;
 
 public:
-	idx_t AppendToBlock(RowDataBlock &block, BufferHandle &handle, vector<BlockAppendEntry> &append_entries,
+	idx_t AppendToBlock(RowDataBlock &block, FileBufferHandle &handle, vector<BlockAppendEntry> &append_entries,
 	                    idx_t remaining, idx_t entry_sizes[]);
 	RowDataBlock &CreateBlock();
-	vector<BufferHandle> Build(idx_t added_count, data_ptr_t key_locations[], idx_t entry_sizes[],
-	                           const SelectionVector *sel = FlatVector::IncrementalSelectionVector());
+	vector<FileBufferHandle> Build(idx_t added_count, data_ptr_t key_locations[], idx_t entry_sizes[],
+	                               const SelectionVector *sel = FlatVector::IncrementalSelectionVector());
 
 	void Merge(RowDataCollection &other);
 

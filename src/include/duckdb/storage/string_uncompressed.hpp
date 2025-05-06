@@ -37,7 +37,7 @@ struct StringDictionaryContainer {
 };
 
 struct StringScanState : public SegmentScanState {
-	BufferHandle handle;
+	FileBufferHandle handle;
 };
 
 //===--------------------------------------------------------------------===//
@@ -98,7 +98,7 @@ public:
 		return StringAppendBase(handle, segment, stats, data, offset, count);
 	}
 
-	static idx_t StringAppendBase(BufferHandle &handle, ColumnSegment &segment, SegmentStatistics &stats,
+	static idx_t StringAppendBase(FileBufferHandle &handle, ColumnSegment &segment, SegmentStatistics &stats,
 	                              UnifiedVectorFormat &data, idx_t offset, idx_t count) {
 		D_ASSERT(segment.GetBlockOffset() == 0);
 		auto handle_ptr = handle.Ptr();
@@ -204,10 +204,10 @@ public:
 		StringStats::Update(stats.statistics, new_value);
 	}
 
-	static void SetDictionary(ColumnSegment &segment, BufferHandle &handle, StringDictionaryContainer dict);
-	static StringDictionaryContainer GetDictionary(ColumnSegment &segment, BufferHandle &handle);
-	static uint32_t GetDictionaryEnd(ColumnSegment &segment, BufferHandle &handle);
-	static idx_t RemainingSpace(ColumnSegment &segment, BufferHandle &handle);
+	static void SetDictionary(ColumnSegment &segment, FileBufferHandle &handle, StringDictionaryContainer dict);
+	static StringDictionaryContainer GetDictionary(ColumnSegment &segment, FileBufferHandle &handle);
+	static uint32_t GetDictionaryEnd(ColumnSegment &segment, FileBufferHandle &handle);
+	static idx_t RemainingSpace(ColumnSegment &segment, FileBufferHandle &handle);
 	static void WriteString(ColumnSegment &segment, string_t string, block_id_t &result_block, int32_t &result_offset);
 	static void WriteStringMemory(ColumnSegment &segment, string_t string, block_id_t &result_block,
 	                              int32_t &result_offset);

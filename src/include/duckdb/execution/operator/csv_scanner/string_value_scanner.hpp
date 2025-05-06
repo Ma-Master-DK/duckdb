@@ -19,7 +19,7 @@ struct CSVBufferUsage {
 	CSVBufferUsage(CSVBufferManager &buffer_manager_p, idx_t buffer_idx_p)
 	    : buffer_manager(buffer_manager_p), buffer_idx(buffer_idx_p) {
 
-	                                        };
+	      };
 	~CSVBufferUsage() {
 		buffer_manager.ResetBuffer(buffer_idx);
 	}
@@ -36,7 +36,7 @@ public:
 
 	//! Reconstructs the current line to be used in error messages
 	string ReconstructCurrentLine(bool &first_char_nl,
-	                              unordered_map<idx_t, shared_ptr<CSVBufferHandle>> &buffer_handles,
+	                              unordered_map<idx_t, shared_ptr<CSVFileBufferHandle>> &buffer_handles,
 	                              bool reconstruct_line) const;
 };
 
@@ -141,7 +141,7 @@ struct ParseTypeInfo {
 class StringValueResult : public ScannerResult {
 public:
 	StringValueResult(CSVStates &states, CSVStateMachine &state_machine,
-	                  const shared_ptr<CSVBufferHandle> &buffer_handle, Allocator &buffer_allocator,
+	                  const shared_ptr<CSVFileBufferHandle> &buffer_handle, Allocator &buffer_allocator,
 	                  idx_t result_size_p, idx_t buffer_position, CSVErrorHandler &error_handler, CSVIterator &iterator,
 	                  bool store_line_size, shared_ptr<CSVFileScan> csv_file_scan, idx_t &lines_read, bool sniffing,
 	                  string path, idx_t scan_id);
@@ -198,7 +198,7 @@ public:
 	bool icu_loaded = false;
 
 	//! We must ensure that we keep the buffers alive until processing the query result
-	unordered_map<idx_t, shared_ptr<CSVBufferHandle>> buffer_handles;
+	unordered_map<idx_t, shared_ptr<CSVFileBufferHandle>> buffer_handles;
 
 	//! Requested size of buffers (i.e., either 32Mb or set by buffer_size parameter)
 	idx_t requested_size;
@@ -343,7 +343,7 @@ private:
 	//! True Position where this scanner started scanning(i.e., after figuring out where the first line starts)
 	idx_t start_pos;
 	//! Pointer to the previous buffer handle, necessary for over-buffer values
-	shared_ptr<CSVBufferHandle> previous_buffer_handle;
+	shared_ptr<CSVFileBufferHandle> previous_buffer_handle;
 	//! Strict state machine, is basically a state machine with rfc 4180 set to true, used to figure out new line.
 	shared_ptr<CSVStateMachine> state_machine_strict;
 };

@@ -150,7 +150,7 @@ public:
 		metadata_ptr = dataptr + segment.GetBlockOffset() + metadata_offset;
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 	data_ptr_t metadata_ptr;
 	idx_t total_value_count = 0;
 	ChimpGroupState<CHIMP_TYPE> group_state;

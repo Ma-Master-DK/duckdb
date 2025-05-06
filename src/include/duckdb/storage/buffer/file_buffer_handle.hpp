@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// duckdb/storage/buffer/buffer_handle.hpp
+// duckdb/storage/buffer/file_buffer_handle.hpp
 //
 //
 //===----------------------------------------------------------------------===//
@@ -12,23 +12,23 @@
 #include "duckdb/common/file_buffer.hpp"
 
 namespace duckdb {
-class BlockHandle;
+class FileBlockHandle;
 class FileBuffer;
 
-class BufferHandle {
+class FileBufferHandle {
 public:
-	DUCKDB_API BufferHandle();
-	DUCKDB_API explicit BufferHandle(shared_ptr<BlockHandle> handle, optional_ptr<FileBuffer> node);
-	DUCKDB_API ~BufferHandle();
+	DUCKDB_API FileBufferHandle();
+	DUCKDB_API explicit FileBufferHandle(shared_ptr<FileBlockHandle> handle, optional_ptr<FileBuffer> node);
+	DUCKDB_API ~FileBufferHandle();
 	// disable copy constructors
-	BufferHandle(const BufferHandle &other) = delete;
-	BufferHandle &operator=(const BufferHandle &) = delete;
+	FileBufferHandle(const FileBufferHandle &other) = delete;
+	FileBufferHandle &operator=(const FileBufferHandle &) = delete;
 	//! enable move constructors
-	DUCKDB_API BufferHandle(BufferHandle &&other) noexcept;
-	DUCKDB_API BufferHandle &operator=(BufferHandle &&) noexcept;
+	DUCKDB_API FileBufferHandle(FileBufferHandle &&other) noexcept;
+	DUCKDB_API FileBufferHandle &operator=(FileBufferHandle &&) noexcept;
 
 public:
-	//! Returns whether or not the BufferHandle is valid.
+	//! Returns whether or not the FileBufferHandle is valid.
 	DUCKDB_API bool IsValid() const;
 	//! Returns a pointer to the buffer data. Handle must be valid.
 	inline data_ptr_t Ptr() const {
@@ -45,13 +45,13 @@ public:
 	//! Destroys the buffer handle
 	DUCKDB_API void Destroy();
 
-	const shared_ptr<BlockHandle> &GetBlockHandle() const {
+	const shared_ptr<FileBlockHandle> &GetFileBlockHandle() const {
 		return handle;
 	}
 
 private:
 	//! The block handle
-	shared_ptr<BlockHandle> handle;
+	shared_ptr<FileBlockHandle> handle;
 	//! The managed buffer node
 	optional_ptr<FileBuffer> node;
 };

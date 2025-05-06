@@ -13,7 +13,7 @@
 
 namespace duckdb {
 class BufferManager;
-class BlockHandle;
+class FileBlockHandle;
 class ClientContext;
 struct ColumnDataCopyFunction;
 class ColumnDataAllocator;

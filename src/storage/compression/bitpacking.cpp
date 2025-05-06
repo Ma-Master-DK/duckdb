@@ -391,7 +391,7 @@ public:
 	ColumnDataCheckpointData &checkpoint_data;
 	CompressionFunction &function;
 	unique_ptr<ColumnSegment> current_segment;
-	BufferHandle handle;
+	FileBufferHandle handle;
 
 	// Ptr to next free spot in segment;
 	data_ptr_t data_ptr;
@@ -640,7 +640,7 @@ public:
 		LoadNextGroup();
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 	ColumnSegment &current_segment;
 
 	T decompression_buffer[BITPACKING_METADATA_GROUP_SIZE];

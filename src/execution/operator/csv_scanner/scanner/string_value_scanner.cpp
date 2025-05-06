@@ -18,7 +18,7 @@ namespace duckdb {
 constexpr idx_t StringValueScanner::LINE_FINDER_ID;
 
 StringValueResult::StringValueResult(CSVStates &states, CSVStateMachine &state_machine,
-                                     const shared_ptr<CSVBufferHandle> &buffer_handle, Allocator &buffer_allocator,
+                                     const shared_ptr<CSVFileBufferHandle> &buffer_handle, Allocator &buffer_allocator,
                                      idx_t result_size_p, idx_t buffer_position, CSVErrorHandler &error_hander_p,
                                      CSVIterator &iterator_p, bool store_line_size_p,
                                      shared_ptr<CSVFileScan> csv_file_scan_p, idx_t &lines_read_p, bool sniffing_p,
@@ -489,7 +489,7 @@ void StringValueResult::Reset() {
 		v->SetAllValid(result_size);
 	}
 	// We keep a reference to the buffer from our current iteration if it already exists
-	shared_ptr<CSVBufferHandle> cur_buffer;
+	shared_ptr<CSVFileBufferHandle> cur_buffer;
 	if (buffer_handles.find(iterator.GetBufferIdx()) != buffer_handles.end()) {
 		cur_buffer = buffer_handles[iterator.GetBufferIdx()];
 	}
@@ -771,7 +771,7 @@ void StringValueResult::NullPaddingQuotedNewlineCheck() const {
 
 //! Reconstructs the current line to be used in error messages
 string FullLinePosition::ReconstructCurrentLine(bool &first_char_nl,
-                                                unordered_map<idx_t, shared_ptr<CSVBufferHandle>> &buffer_handles,
+                                                unordered_map<idx_t, shared_ptr<CSVFileBufferHandle>> &buffer_handles,
                                                 bool reconstruct_line) const {
 	if (!reconstruct_line || begin == end) {
 		return {};

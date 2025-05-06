@@ -127,9 +127,9 @@ public:
 	//! Lock for modifying pinned_handles
 	mutex pinned_handles_lock;
 	//! Where handles to row blocks will be stored with TupleDataPinProperties::KEEP_EVERYTHING_PINNED
-	unsafe_vector<BufferHandle> pinned_row_handles;
+	unsafe_vector<FileBufferHandle> pinned_row_handles;
 	//! Where handles to heap blocks will be stored with TupleDataPinProperties::KEEP_EVERYTHING_PINNED
-	unsafe_vector<BufferHandle> pinned_heap_handles;
+	unsafe_vector<FileBufferHandle> pinned_heap_handles;
 };
 
 } // namespace duckdb

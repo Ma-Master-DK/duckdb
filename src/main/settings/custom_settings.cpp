@@ -25,7 +25,7 @@
 #include "duckdb/parallel/task_scheduler.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/planner/expression_binder.hpp"
-#include "duckdb/storage/buffer/buffer_pool.hpp"
+#include "duckdb/storage/buffer/file_buffer_pool.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 #include "duckdb/storage/storage_manager.hpp"
 #include "duckdb/logging/logger.hpp"
@@ -72,7 +72,7 @@ void AllocatorBulkDeallocationFlushThresholdSetting::SetGlobal(DatabaseInstance 
                                                                const Value &input) {
 	config.options.allocator_bulk_deallocation_flush_threshold = DBConfig::ParseMemoryLimit(input.ToString());
 	if (db) {
-		BufferManager::GetBufferManager(*db).GetBufferPool().SetAllocatorBulkDeallocationFlushThreshold(
+		BufferManager::GetBufferManager(*db).GetFileBufferPool().SetAllocatorBulkDeallocationFlushThreshold(
 		    config.options.allocator_bulk_deallocation_flush_threshold);
 	}
 }
@@ -81,7 +81,7 @@ void AllocatorBulkDeallocationFlushThresholdSetting::ResetGlobal(DatabaseInstanc
 	config.options.allocator_bulk_deallocation_flush_threshold =
 	    DBConfig().options.allocator_bulk_deallocation_flush_threshold;
 	if (db) {
-		BufferManager::GetBufferManager(*db).GetBufferPool().SetAllocatorBulkDeallocationFlushThreshold(
+		BufferManager::GetBufferManager(*db).GetFileBufferPool().SetAllocatorBulkDeallocationFlushThreshold(
 		    config.options.allocator_bulk_deallocation_flush_threshold);
 	}
 }

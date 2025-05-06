@@ -217,7 +217,7 @@ public:
 	DataChunk rhs_keys;
 	DataChunk rhs_input;
 	ExpressionExecutor rhs_executor;
-	vector<BufferHandle> payload_heap_handles;
+	vector<FileBufferHandle> payload_heap_handles;
 
 public:
 	void ResolveJoinKeys(DataChunk &input) {

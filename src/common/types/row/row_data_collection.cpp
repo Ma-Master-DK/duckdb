@@ -9,7 +9,7 @@ RowDataCollection::RowDataCollection(BufferManager &buffer_manager, idx_t block_
 	D_ASSERT(block_capacity * entry_size + entry_size > buffer_manager.GetBlockSize());
 }
 
-idx_t RowDataCollection::AppendToBlock(RowDataBlock &block, BufferHandle &handle,
+idx_t RowDataCollection::AppendToBlock(RowDataBlock &block, FileBufferHandle &handle,
                                        vector<BlockAppendEntry> &append_entries, idx_t remaining, idx_t entry_sizes[]) {
 	idx_t append_count = 0;
 	data_ptr_t dataptr;
@@ -47,9 +47,9 @@ RowDataBlock &RowDataCollection::CreateBlock() {
 	return *blocks.back();
 }
 
-vector<BufferHandle> RowDataCollection::Build(idx_t added_count, data_ptr_t key_locations[], idx_t entry_sizes[],
-                                              const SelectionVector *sel) {
-	vector<BufferHandle> handles;
+vector<FileBufferHandle> RowDataCollection::Build(idx_t added_count, data_ptr_t key_locations[], idx_t entry_sizes[],
+                                                  const SelectionVector *sel) {
+	vector<FileBufferHandle> handles;
 	vector<BlockAppendEntry> append_entries;
 
 	// first allocate space of where to serialize the keys and payload columns

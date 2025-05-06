@@ -131,7 +131,7 @@ void RowDataCollectionScanner::ScanState::PinData() {
 	auto &rows = scanner.rows;
 	D_ASSERT(block_idx < rows.blocks.size());
 	auto &data_block = rows.blocks[block_idx];
-	if (!data_handle.IsValid() || data_handle.GetBlockHandle() != data_block->block) {
+	if (!data_handle.IsValid() || data_handle.GetFileBlockHandle() != data_block->block) {
 		data_handle = rows.buffer_manager.Pin(data_block->block);
 	}
 	if (scanner.layout.AllConstant() || !scanner.external) {
@@ -141,7 +141,7 @@ void RowDataCollectionScanner::ScanState::PinData() {
 	auto &heap = scanner.heap;
 	D_ASSERT(block_idx < heap.blocks.size());
 	auto &heap_block = heap.blocks[block_idx];
-	if (!heap_handle.IsValid() || heap_handle.GetBlockHandle() != heap_block->block) {
+	if (!heap_handle.IsValid() || heap_handle.GetFileBlockHandle() != heap_block->block) {
 		heap_handle = heap.buffer_manager.Pin(heap_block->block);
 	}
 }
@@ -255,7 +255,7 @@ void RowDataCollectionScanner::Scan(DataChunk &chunk) {
 	auto data_pointers = FlatVector::GetData<data_ptr_t>(addresses);
 
 	// We must pin ALL blocks we are going to gather from
-	vector<BufferHandle> pinned_blocks;
+	vector<FileBufferHandle> pinned_blocks;
 	while (scanned < count) {
 		read_state.PinData();
 		auto &data_block = rows.blocks[read_state.block_idx];

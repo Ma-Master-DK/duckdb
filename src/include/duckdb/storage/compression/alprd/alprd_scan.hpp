@@ -97,7 +97,7 @@ public:
 		       actual_dictionary_size_bytes);
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 	data_ptr_t metadata_ptr;
 	data_ptr_t segment_data;
 	idx_t total_value_count = 0;

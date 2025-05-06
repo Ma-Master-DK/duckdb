@@ -13,7 +13,7 @@
 
 namespace duckdb {
 
-class BufferHandle;
+class FileBufferHandle;
 class RowDataCollection;
 struct RowDataBlock;
 class DataChunk;
@@ -35,11 +35,11 @@ public:
 		idx_t block_idx;
 		idx_t entry_idx;
 
-		BufferHandle data_handle;
-		BufferHandle heap_handle;
+		FileBufferHandle data_handle;
+		FileBufferHandle heap_handle;
 
 		// We must pin ALL blocks we are going to gather from
-		vector<BufferHandle> pinned_blocks;
+		vector<FileBufferHandle> pinned_blocks;
 	};
 
 	//! Ensure that heap blocks correspond to row blocks

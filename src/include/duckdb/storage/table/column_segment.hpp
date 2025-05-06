@@ -13,7 +13,7 @@
 #include "duckdb/common/types/vector.hpp"
 #include "duckdb/function/compression_function.hpp"
 #include "duckdb/storage/file_block.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 #include "duckdb/storage/statistics/segment_statistics.hpp"
 #include "duckdb/storage/storage_lock.hpp"
@@ -40,7 +40,7 @@ enum class ColumnSegmentType : uint8_t { TRANSIENT, PERSISTENT };
 class ColumnSegment : public SegmentBase<ColumnSegment> {
 public:
 	//! Construct a column segment.
-	ColumnSegment(DatabaseInstance &db, shared_ptr<BlockHandle> block, const LogicalType &type,
+	ColumnSegment(DatabaseInstance &db, shared_ptr<FileBlockHandle> block, const LogicalType &type,
 	              const ColumnSegmentType segment_type, const idx_t start, const idx_t count,
 	              CompressionFunction &function_p, BaseStatistics statistics, const block_id_t block_id_p,
 	              const idx_t offset, const idx_t segment_size_p,
@@ -102,7 +102,7 @@ public:
 	void ConvertToPersistent(optional_ptr<BlockManager> block_manager, block_id_t block_id);
 	//! Updates pointers to refer to the given block and offset. This is only used
 	//! when sharing a block among segments. This is invoked only AFTER the block is written.
-	void MarkAsPersistent(shared_ptr<BlockHandle> block, uint32_t offset_in_block);
+	void MarkAsPersistent(shared_ptr<FileBlockHandle> block, uint32_t offset_in_block);
 	//! Gets a data pointer from a persistent column segment
 	DataPointer GetDataPointer();
 
@@ -151,7 +151,7 @@ public:
 	//! The statistics for the segment
 	SegmentStatistics stats;
 	//! The block that this segment relates to
-	shared_ptr<BlockHandle> block;
+	shared_ptr<FileBlockHandle> block;
 
 private:
 	//! The compression function

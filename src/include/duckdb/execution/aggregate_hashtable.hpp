@@ -13,12 +13,12 @@
 #include "duckdb/execution/base_aggregate_hashtable.hpp"
 #include "duckdb/execution/ht_entry.hpp"
 #include "duckdb/storage/arena_allocator.hpp"
-#include "duckdb/storage/buffer/buffer_handle.hpp"
+#include "duckdb/storage/buffer/file_buffer_handle.hpp"
 
 namespace duckdb {
 
-class BlockHandle;
-class BufferHandle;
+class FileBlockHandle;
+class FileBufferHandle;
 
 struct FlushMoveState;
 

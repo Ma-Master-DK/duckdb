@@ -1,6 +1,6 @@
 #include "duckdb/storage/metadata/metadata_manager.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
-#include "duckdb/storage/buffer/block_handle.hpp"
+#include "duckdb/storage/buffer/file_block_handle.hpp"
 #include "duckdb/common/serializer/write_stream.hpp"
 #include "duckdb/common/serializer/read_stream.hpp"
 #include "duckdb/storage/database_size.hpp"
@@ -67,7 +67,7 @@ void MetadataManager::ConvertToTransient(MetadataBlock &metadata_block) {
 
 	// allocate a new transient block to replace it
 	auto new_buffer = buffer_manager.Allocate(MemoryTag::METADATA, block_manager.GetBlockSize(), false);
-	auto new_block = new_buffer.GetBlockHandle();
+	auto new_block = new_buffer.GetFileBlockHandle();
 
 	// copy the data to the transient block
 	memcpy(new_buffer.Ptr(), old_buffer.Ptr(), block_manager.GetBlockSize());
@@ -82,7 +82,7 @@ block_id_t MetadataManager::AllocateNewBlock() {
 
 	MetadataBlock new_block;
 	auto handle = buffer_manager.Allocate(MemoryTag::METADATA, block_manager.GetBlockSize(), false);
-	new_block.block = handle.GetBlockHandle();
+	new_block.block = handle.GetFileBlockHandle();
 	new_block.block_id = new_block_id;
 	for (idx_t i = 0; i < METADATA_BLOCK_COUNT; i++) {
 		new_block.free_blocks.push_back(NumericCast<uint8_t>(METADATA_BLOCK_COUNT - i - 1));
@@ -320,8 +320,8 @@ vector<MetadataBlockInfo> MetadataManager::GetMetadataInfo() const {
 	return result;
 }
 
-vector<shared_ptr<BlockHandle>> MetadataManager::GetBlocks() const {
-	vector<shared_ptr<BlockHandle>> result;
+vector<shared_ptr<FileBlockHandle>> MetadataManager::GetBlocks() const {
+	vector<shared_ptr<FileBlockHandle>> result;
 	for (auto &entry : blocks) {
 		result.push_back(entry.second.block);
 	}

@@ -116,12 +116,12 @@ struct CompressedSegmentState {
 };
 
 struct CompressionAppendState {
-	explicit CompressionAppendState(BufferHandle handle_p) : handle(std::move(handle_p)) {
+	explicit CompressionAppendState(FileBufferHandle handle_p) : handle(std::move(handle_p)) {
 	}
 	virtual ~CompressionAppendState() {
 	}
 
-	BufferHandle handle;
+	FileBufferHandle handle;
 
 	template <class TARGET>
 	TARGET &Cast() {

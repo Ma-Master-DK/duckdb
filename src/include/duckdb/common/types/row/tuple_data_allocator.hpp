@@ -43,7 +43,7 @@ public:
 
 public:
 	//! The underlying row block
-	shared_ptr<BlockHandle> handle;
+	shared_ptr<FileBlockHandle> handle;
 	//! Capacity (in bytes)
 	idx_t capacity;
 	//! Occupied size (in bytes)
@@ -98,13 +98,13 @@ private:
 	                                  unsafe_vector<reference<TupleDataChunkPart>> &parts);
 	//! Internal function for ReleaseOrStoreHandles
 	static void ReleaseOrStoreHandlesInternal(TupleDataSegment &segment,
-	                                          unsafe_vector<BufferHandle> &pinned_row_handles,
-	                                          perfect_map_t<BufferHandle> &handles, const perfect_set_t &block_ids,
+	                                          unsafe_vector<FileBufferHandle> &pinned_row_handles,
+	                                          perfect_map_t<FileBufferHandle> &handles, const perfect_set_t &block_ids,
 	                                          unsafe_vector<TupleDataBlock> &blocks, TupleDataPinProperties properties);
 	//! Pins the given row block
-	BufferHandle &PinRowBlock(TupleDataPinState &state, const TupleDataChunkPart &part);
+	FileBufferHandle &PinRowBlock(TupleDataPinState &state, const TupleDataChunkPart &part);
 	//! Pins the given heap block
-	BufferHandle &PinHeapBlock(TupleDataPinState &state, const TupleDataChunkPart &part);
+	FileBufferHandle &PinHeapBlock(TupleDataPinState &state, const TupleDataChunkPart &part);
 	//! Gets the pointer to the rows for the given chunk part
 	data_ptr_t GetRowPointer(TupleDataPinState &state, const TupleDataChunkPart &part);
 	//! Gets the base pointer to the heap for the given chunk part

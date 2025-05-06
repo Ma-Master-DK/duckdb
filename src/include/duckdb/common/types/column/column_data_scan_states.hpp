@@ -36,7 +36,7 @@ enum class ColumnDataScanProperties : uint8_t {
 };
 
 struct ChunkManagementState {
-	unordered_map<idx_t, BufferHandle> handles;
+	unordered_map<idx_t, FileBufferHandle> handles;
 	ColumnDataScanProperties properties = ColumnDataScanProperties::INVALID;
 };
 

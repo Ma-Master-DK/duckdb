@@ -354,7 +354,7 @@ const BufferManager &DatabaseInstance::GetBufferManager() const {
 	return *buffer_manager;
 }
 
-BufferPool &DatabaseInstance::GetBufferPool() const {
+FileBufferPool &DatabaseInstance::GetFileBufferPool() const {
 	return *config.buffer_pool;
 }
 
@@ -456,9 +456,9 @@ void DatabaseInstance::Configure(DBConfig &new_config, const char *database_path
 	if (new_config.buffer_pool) {
 		config.buffer_pool = std::move(new_config.buffer_pool);
 	} else {
-		config.buffer_pool = make_shared_ptr<BufferPool>(config.options.maximum_memory,
-		                                                 config.options.buffer_manager_track_eviction_timestamps,
-		                                                 config.options.allocator_bulk_deallocation_flush_threshold);
+		config.buffer_pool = make_shared_ptr<FileBufferPool>(
+		    config.options.maximum_memory, config.options.buffer_manager_track_eviction_timestamps,
+		    config.options.allocator_bulk_deallocation_flush_threshold);
 	}
 	config.db_cache_entry = std::move(new_config.db_cache_entry);
 }

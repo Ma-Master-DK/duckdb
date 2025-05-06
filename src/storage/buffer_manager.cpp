@@ -3,20 +3,20 @@
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_buffer.hpp"
-#include "duckdb/storage/buffer/buffer_pool.hpp"
+#include "duckdb/storage/buffer/file_buffer_pool.hpp"
 #include "duckdb/storage/standard_buffer_manager.hpp"
 
 namespace duckdb {
 
-shared_ptr<BlockHandle> BufferManager::RegisterTransientMemory(const idx_t size, const idx_t block_size) {
+shared_ptr<FileBlockHandle> BufferManager::RegisterTransientMemory(const idx_t size, const idx_t block_size) {
 	throw NotImplementedException("This type of BufferManager can not create 'transient-memory' blocks");
 }
 
-shared_ptr<BlockHandle> BufferManager::RegisterSmallMemory(const idx_t size) {
+shared_ptr<FileBlockHandle> BufferManager::RegisterSmallMemory(const idx_t size) {
 	return RegisterSmallMemory(MemoryTag::BASE_TABLE, size);
 }
 
-shared_ptr<BlockHandle> BufferManager::RegisterSmallMemory(MemoryTag tag, const idx_t size) {
+shared_ptr<FileBlockHandle> BufferManager::RegisterSmallMemory(MemoryTag tag, const idx_t size) {
 	throw NotImplementedException("This type of BufferManager can not create 'small-memory' blocks");
 }
 
@@ -47,7 +47,7 @@ const string &BufferManager::GetTemporaryDirectory() const {
 	throw InternalException("This type of BufferManager does not allow a temporary directory");
 }
 
-BufferPool &BufferManager::GetBufferPool() const {
+FileBufferPool &BufferManager::GetFileBufferPool() const {
 	throw InternalException("This type of BufferManager does not have a buffer pool");
 }
 
@@ -65,7 +65,7 @@ bool BufferManager::HasTemporaryDirectory() const {
 
 //! Returns the maximum available memory for a given query
 idx_t BufferManager::GetQueryMaxMemory() const {
-	return GetBufferPool().GetQueryMaxMemory();
+	return GetFileBufferPool().GetQueryMaxMemory();
 }
 
 unique_ptr<FileBuffer> BufferManager::ConstructManagedBuffer(idx_t size, unique_ptr<FileBuffer> &&, DBBufferType type) {
@@ -74,7 +74,7 @@ unique_ptr<FileBuffer> BufferManager::ConstructManagedBuffer(idx_t size, unique_
 
 // Protected methods
 
-void BufferManager::AddToEvictionQueue(shared_ptr<BlockHandle> &handle) {
+void BufferManager::AddToEvictionQueue(shared_ptr<FileBlockHandle> &handle) {
 	throw NotImplementedException("This type of BufferManager does not support 'AddToEvictionQueue");
 }
 
@@ -82,12 +82,12 @@ void BufferManager::WriteTemporaryBuffer(MemoryTag tag, block_id_t block_id, Fil
 	throw NotImplementedException("This type of BufferManager does not support 'WriteTemporaryBuffer");
 }
 
-unique_ptr<FileBuffer> BufferManager::ReadTemporaryBuffer(MemoryTag tag, BlockHandle &block,
+unique_ptr<FileBuffer> BufferManager::ReadTemporaryBuffer(MemoryTag tag, FileBlockHandle &block,
                                                           unique_ptr<FileBuffer> buffer) {
 	throw NotImplementedException("This type of BufferManager does not support 'ReadTemporaryBuffer");
 }
 
-void BufferManager::DeleteTemporaryFile(BlockHandle &block) {
+void BufferManager::DeleteTemporaryFile(FileBlockHandle &block) {
 	throw NotImplementedException("This type of BufferManager does not support 'DeleteTemporaryFile");
 }
 
