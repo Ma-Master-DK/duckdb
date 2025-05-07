@@ -13,7 +13,10 @@ option(STATIC_LIBCPP "Statically link CLI to libc++" FALSE)
 
 add_executable(shell ${SHELL_SOURCES})
 target_link_libraries(shell sqlite3_api_wrapper_static
-                      ${DUCKDB_EXTRA_LINK_FLAGS})
+${DUCKDB_EXTRA_LINK_FLAGS} ${XNVME_LIBRARIES})
+include_directories(${XNVME_INCLUDE_DIRS})
+target_link_directories(shell PRIVATE ${XNVME_LIBRARY_DIRS})
+
 link_threads(shell "")
 if(STATIC_LIBCPP)
   message("Statically linking CLI")
