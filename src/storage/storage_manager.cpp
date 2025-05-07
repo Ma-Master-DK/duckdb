@@ -162,12 +162,13 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	}
 	// Check if the database file already exists.
 	// Note: a file can also exist if there was a ROLLBACK on a previous transaction creating that file.
-	if (!read_only && !fs.FileExists(path)) {
+	// if (!read_only && !fs.FileExists(path)) {
+	if (false) {
 		// file does not exist and we are in read-write mode
 		// create a new file
 
 		// check if a WAL file already exists
-		auto wal_path = GetWALPath();
+		auto wal_path = "~/thesis/test/db.wal"; // GetWALPath();
 		if (fs.FileExists(wal_path)) {
 			// WAL file exists but database file does not
 			// remove the WAL
@@ -220,7 +221,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		auto checkpoint_reader = SingleFileCheckpointReader(*this);
 		checkpoint_reader.LoadFromStorage();
 
-		auto wal_path = GetWALPath();
+		auto wal_path = "~/thesis/test/db.wal"; // GetWALPath();
 		wal = WriteAheadLog::Replay(fs, db, wal_path);
 	}
 	if (row_group_size > 122880ULL && GetStorageVersion() < 4) {

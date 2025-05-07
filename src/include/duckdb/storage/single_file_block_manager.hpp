@@ -11,11 +11,12 @@
 #include "duckdb/common/common.hpp"
 #include "duckdb/storage/block_manager.hpp"
 #include "duckdb/storage/block.hpp"
-#include "duckdb/common/file_system.hpp"
 #include "duckdb/common/unordered_set.hpp"
 #include "duckdb/common/set.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/main/config.hpp"
+
+#include <libxnvme.h>
 
 namespace duckdb {
 
@@ -38,6 +39,8 @@ class SingleFileBlockManager : public BlockManager {
 
 public:
 	SingleFileBlockManager(AttachedDatabase &db, const string &path, const StorageManagerOptions &options);
+
+	~SingleFileBlockManager() override;
 
 	FileOpenFlags GetFileFlags(bool create_new) const;
 	//! Creates a new database.
@@ -119,7 +122,7 @@ private:
 	//! The path where the file is stored
 	string path;
 	//! The file handle
-	unique_ptr<FileHandle> handle;
+	xnvme_dev *dev;
 	//! The buffer used to read/write to the headers
 	FileBuffer header_buffer;
 	//! The list of free blocks that can be written to currently

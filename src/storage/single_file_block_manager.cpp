@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <libxnvme.h>
 
 namespace duckdb {
 
@@ -41,15 +42,17 @@ void MainHeader::Write(WriteStream &ser) {
 	SerializeVersionNumber(ser, DuckDB::SourceID());
 }
 
-void MainHeader::CheckMagicBytes(FileHandle &handle) {
-	data_t magic_bytes[MAGIC_BYTE_SIZE];
-	if (handle.GetFileSize() < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
-	}
-	handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
-	if (memcmp(magic_bytes, MainHeader::MAGIC_BYTES, MainHeader::MAGIC_BYTE_SIZE) != 0) {
-		throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
-	}
+void MainHeader::CheckMagicBytes(xnvme_dev *dev) {
+	// data_t magic_bytes[MAGIC_BYTE_SIZE];
+	// if (handle.GetFileSize() < MainHeader::MAGIC_BYTE_SIZE + MainHeader::MAGIC_BYTE_OFFSET) {
+	// 	throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+	// }
+	//
+	// handle.Read(magic_bytes, MainHeader::MAGIC_BYTE_SIZE, MainHeader::MAGIC_BYTE_OFFSET);
+	//
+	// if (memcmp(magic_bytes, MainHeader::MAGIC_BYTES, MainHeader::MAGIC_BYTE_SIZE) != 0) {
+	// 	throw IOException("The file \"%s\" exists, but it is not a valid DuckDB database file!", handle.path);
+	// }
 }
 
 MainHeader MainHeader::Read(ReadStream &source) {
@@ -157,6 +160,10 @@ SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const strin
       iteration_count(0), options(options) {
 }
 
+SingleFileBlockManager::~SingleFileBlockManager() {
+	xnvme_dev_close(dev);
+}
+
 FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {
 	FileOpenFlags result;
 	if (options.read_only) {
@@ -196,11 +203,12 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 }
 
 void SingleFileBlockManager::CreateNewDatabase() {
-	auto flags = GetFileFlags(true);
-
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
+	xnvme_opts opts = xnvme_opts_default();
+	dev = xnvme_dev_open(path.c_str(), &opts);
+	if (!dev) {
+		xnvme_cli_perr("xnvme_dev_open()", errno);
+		return;
+	}
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -246,7 +254,8 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	ChecksumAndWrite(header_buffer, Storage::FILE_HEADER_SIZE * 2ULL);
 
 	// ensure that writing to disk is completed before returning
-	handle->Sync();
+	FileSync();
+
 	// we start with h2 as active_header, this way our initial write will be in h1
 	iteration_count = 0;
 	active_header = 1;
@@ -254,17 +263,15 @@ void SingleFileBlockManager::CreateNewDatabase() {
 }
 
 void SingleFileBlockManager::LoadExistingDatabase() {
-	auto flags = GetFileFlags(false);
-
-	// open the RDBMS handle
-	auto &fs = FileSystem::Get(db);
-	handle = fs.OpenFile(path, flags);
-	if (!handle) {
-		// this can only happen in read-only mode - as that is when we set FILE_FLAGS_NULL_IF_NOT_EXISTS
-		throw IOException("Cannot open database \"%s\" in read-only mode: database does not exist", path);
+	xnvme_opts opts = xnvme_opts_default();
+	dev = xnvme_dev_open(path.c_str(), &opts);
+	if (!dev) {
+		xnvme_cli_perr("xnvme_dev_open()", errno);
+		return;
 	}
 
-	MainHeader::CheckMagicBytes(*handle);
+	MainHeader::CheckMagicBytes(dev);
+
 	// otherwise, we check the metadata of the file
 	ReadAndChecksum(header_buffer, 0);
 	MainHeader main_header = DeserializeMainHeader(header_buffer.buffer);
@@ -295,7 +302,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
 	// read the buffer from disk
-	block.Read(*handle, location);
+	block.Read(dev, location);
 
 	// compute the checksum
 	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
@@ -313,8 +320,9 @@ void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t locati
 	// compute the checksum and write it to the start of the buffer (if not temp buffer)
 	uint64_t checksum = Checksum(block.buffer, block.Size());
 	Store<uint64_t>(checksum, block.InternalBuffer());
+
 	// now write the buffer
-	block.Write(*handle, location);
+	block.Write(dev, location);
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {
@@ -327,7 +335,8 @@ void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const opti
 		auto requested_compat_version = options.storage_version.GetIndex();
 		if (requested_compat_version < header.serialization_compatibility) {
 			throw InvalidInputException(
-			    "Error opening \"%s\": cannot initialize database with storage version %d - which is lower than what "
+			    "Error opening \"%s\": cannot initialize database with storage version %d - which is lower than "
+			    "what "
 			    "the database itself uses (%d). The storage version of an existing database cannot be lowered.",
 			    path, requested_compat_version, header.serialization_compatibility);
 		}
@@ -336,10 +345,10 @@ void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const opti
 		options.storage_version = header.serialization_compatibility;
 	}
 	if (header.serialization_compatibility > SerializationCompatibility::Latest().serialization_version) {
-		throw InvalidInputException(
-		    "Error opening \"%s\": file was written with a storage version greater than the latest version supported "
-		    "by this DuckDB instance. Try opening the file with a newer version of DuckDB.",
-		    path);
+		throw InvalidInputException("Error opening \"%s\": file was written with a storage version greater than "
+		                            "the latest version supported "
+		                            "by this DuckDB instance. Try opening the file with a newer version of DuckDB.",
+		                            path);
 	}
 	db.GetStorageManager().SetStorageVersion(options.storage_version.GetIndex());
 
@@ -550,7 +559,7 @@ idx_t SingleFileBlockManager::FreeBlocks() {
 }
 
 bool SingleFileBlockManager::IsRemote() {
-	return !handle->OnDiskFile();
+	return false;
 }
 
 unique_ptr<Block> SingleFileBlockManager::ConvertBlock(block_id_t block_id, FileBuffer &source_buffer) {
@@ -585,7 +594,7 @@ void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_blo
 
 	// read the buffer from disk
 	auto location = GetBlockLocation(start_block);
-	buffer.Read(*handle, location);
+	buffer.Read(dev, location);
 
 	// for each of the blocks - verify the checksum
 	auto ptr = buffer.InternalBuffer();
@@ -610,25 +619,26 @@ void SingleFileBlockManager::Write(FileBuffer &buffer, block_id_t block_id) {
 }
 
 void SingleFileBlockManager::Truncate() {
-	BlockManager::Truncate();
-	idx_t blocks_to_truncate = 0;
-	// reverse iterate over the free-list
-	for (auto entry = free_list.rbegin(); entry != free_list.rend(); entry++) {
-		auto block_id = *entry;
-		if (block_id + 1 != max_block) {
-			break;
-		}
-		blocks_to_truncate++;
-		max_block--;
-	}
-	if (blocks_to_truncate == 0) {
-		// nothing to truncate
-		return;
-	}
-	// truncate the file
-	free_list.erase(free_list.lower_bound(max_block), free_list.end());
-	newly_freed_list.erase(newly_freed_list.lower_bound(max_block), newly_freed_list.end());
-	handle->Truncate(NumericCast<int64_t>(BLOCK_START + NumericCast<idx_t>(max_block) * GetBlockAllocSize()));
+	return;
+	// BlockManager::Truncate();
+	// idx_t blocks_to_truncate = 0;
+	// // reverse iterate over the free-list
+	// for (auto entry = free_list.rbegin(); entry != free_list.rend(); entry++) {
+	// 	auto block_id = *entry;
+	// 	if (block_id + 1 != max_block) {
+	// 		break;
+	// 	}
+	// 	blocks_to_truncate++;
+	// 	max_block--;
+	// }
+	// if (blocks_to_truncate == 0) {
+	// 	// nothing to truncate
+	// 	return;
+	// }
+	// // truncate the file
+	// free_list.erase(free_list.lower_bound(max_block), free_list.end());
+	// newly_freed_list.erase(newly_freed_list.lower_bound(max_block), newly_freed_list.end());
+	// handle->Truncate(NumericCast<int64_t>(BLOCK_START + NumericCast<idx_t>(max_block) * GetBlockAllocSize()));
 }
 
 vector<MetadataHandle> SingleFileBlockManager::GetFreeListBlocks() {
@@ -729,7 +739,7 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	}
 
 	// We need to fsync BEFORE we write the header to ensure that all the previous blocks are written as well
-	handle->Sync();
+	FileSync();
 
 	header_buffer.Clear();
 	// if we are upgrading the database from version 64 -> version 65, we need to re-write the main header
@@ -753,32 +763,35 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 	// switch active header to the other header
 	active_header = 1 - active_header;
 	//! Ensure the header write ends up on disk
-	handle->Sync();
+	FileSync();
+
 	// Release the free blocks to the filesystem.
 	TrimFreeBlocks();
 }
 
 void SingleFileBlockManager::FileSync() {
-	handle->Sync();
+	return;
+	// handle->Sync();
 }
 
 void SingleFileBlockManager::TrimFreeBlocks() {
-	if (DBConfig::Get(db).options.trim_free_blocks) {
-		for (auto itr = newly_freed_list.begin(); itr != newly_freed_list.end(); ++itr) {
-			block_id_t first = *itr;
-			block_id_t last = first;
-			// Find end of contiguous range.
-			for (++itr; itr != newly_freed_list.end() && (*itr == last + 1); ++itr) {
-				last = *itr;
-			}
-			// We are now one too far.
-			--itr;
-			// Trim the range.
-			handle->Trim(BLOCK_START + (NumericCast<idx_t>(first) * GetBlockAllocSize()),
-			             NumericCast<idx_t>(last + 1 - first) * GetBlockAllocSize());
-		}
-	}
-	newly_freed_list.clear();
+	return;
+	// if (DBConfig::Get(db).options.trim_free_blocks) {
+	// 	for (auto itr = newly_freed_list.begin(); itr != newly_freed_list.end(); ++itr) {
+	// 		block_id_t first = *itr;
+	// 		block_id_t last = first;
+	// 		// Find end of contiguous range.
+	// 		for (++itr; itr != newly_freed_list.end() && (*itr == last + 1); ++itr) {
+	// 			last = *itr;
+	// 		}
+	// 		// We are now one too far.
+	// 		--itr;
+	// 		// Trim the range.
+	// 		handle->Trim(BLOCK_START + (NumericCast<idx_t>(first) * GetBlockAllocSize()),
+	// 		             NumericCast<idx_t>(last + 1 - first) * GetBlockAllocSize());
+	// 	}
+	// }
+	// newly_freed_list.clear();
 }
 
 } // namespace duckdb

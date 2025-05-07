@@ -6,7 +6,11 @@
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/storage/storage_info.hpp"
+#include <cstdint>
 #include <cstring>
+
+#include <libxnvme.h>
+#include <libxnvme_nvm.h>
 
 namespace duckdb {
 
@@ -91,9 +95,52 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	handle.Read(internal_buffer, internal_size, location);
 }
 
+void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
+	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
+	auto lba_location = location / lba_size;
+	auto cuts = internal_size / lba_size;
+
+	for (uint64_t i = 0; i < cuts; i++) {
+		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+
+		int err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location, cuts, internal_buffer, nullptr);
+		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+			goto exit;
+		}
+	}
+
+exit:
+	return;
+}
+
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 	handle.Write(internal_buffer, internal_size, location);
+}
+
+void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
+	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+
+	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
+	auto lba_location = location / lba_size;
+	auto cuts = internal_size / lba_size;
+
+	for (uint64_t i = 0; i < cuts; i++) {
+		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+
+		int err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location, 1, internal_buffer, nullptr);
+		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+			goto exit;
+		}
+	}
+
+exit:
+	return;
 }
 
 void FileBuffer::Clear() {

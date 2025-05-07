@@ -11,6 +11,8 @@
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/debug_initialize.hpp"
 
+#include <libxnvme.h>
+
 namespace duckdb {
 class Allocator;
 struct FileHandle;
@@ -41,8 +43,10 @@ public:
 public:
 	//! Read into the FileBuffer from the specified location.
 	void Read(FileHandle &handle, uint64_t location);
+	void Read(xnvme_dev *handle, uint64_t location);
 	//! Write the contents of the FileBuffer to the specified location.
 	void Write(FileHandle &handle, uint64_t location);
+	void Write(xnvme_dev *handle, uint64_t location);
 
 	void Clear();
 
