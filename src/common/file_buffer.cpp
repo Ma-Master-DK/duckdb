@@ -97,22 +97,34 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 
 void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+	struct xnvme_cmd_ctx ctx;
+	int err;
+
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	auto lba_location = location / lba_size;
-	auto cuts = internal_size / lba_size;
+	auto lba_amount = internal_size / lba_size;
 
-	for (uint64_t i = 0; i < cuts; i++) {
-		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	auto nvme_buf_size = lba_size * lba_amount;
+	char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
+	if (!nvme_buf) {
+		xnvme_cli_perr("xnvme_buf_alloc()", errno);
+		goto exit;
+	}
+	memset(nvme_buf, 0, nvme_buf_size);
 
-		int err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location, cuts, internal_buffer, nullptr);
-		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-			xnvme_cli_perr("xnvme_nvm_write()", err);
-			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-			goto exit;
-		}
+	ctx = xnvme_cmd_ctx_from_dev(dev);
+
+	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location, lba_amount - 1, nvme_buf, nullptr);
+	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+		xnvme_cli_perr("xnvme_nvm_write()", err);
+		xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+		goto exit;
 	}
 
+	memcpy(internal_buffer, nvme_buf, nvme_buf_size);
+
 exit:
+	xnvme_buf_free(dev, nvme_buf);
 	return;
 }
 
@@ -123,23 +135,34 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 
 void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+	int err;
+	struct xnvme_cmd_ctx ctx;
 
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	auto lba_location = location / lba_size;
-	auto cuts = internal_size / lba_size;
+	auto lba_amount = internal_size / lba_size;
 
-	for (uint64_t i = 0; i < cuts; i++) {
-		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	auto nvme_buf_size = lba_size * lba_amount;
+	char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
+	if (!nvme_buf) {
+		xnvme_cli_perr("xnvme_buf_alloc()", errno);
+		goto exit;
+	}
+	memset(nvme_buf, 0, nvme_buf_size);
 
-		int err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location, 1, internal_buffer, nullptr);
-		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-			xnvme_cli_perr("xnvme_nvm_write()", err);
-			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-			goto exit;
-		}
+	memcpy(nvme_buf, internal_buffer, nvme_buf_size);
+
+	ctx = xnvme_cmd_ctx_from_dev(dev);
+
+	err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location, lba_amount - 1, nvme_buf, nullptr);
+	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+		xnvme_cli_perr("xnvme_nvm_write()", err);
+		xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+		goto exit;
 	}
 
 exit:
+	xnvme_buf_free(dev, nvme_buf);
 	return;
 }
 

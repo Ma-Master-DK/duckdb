@@ -74,17 +74,19 @@ void StorageManager::ResetWAL() {
 string StorageManager::GetWALPath() {
 	// we append the ".wal" **before** a question mark in case of GET parameters
 	// but only if we are not in a windows long path (which starts with \\?\)
-	std::size_t question_mark_pos = std::string::npos;
-	if (!StringUtil::StartsWith(path, "\\\\?\\")) {
-		question_mark_pos = path.find('?');
-	}
-	auto wal_path = path;
-	if (question_mark_pos != std::string::npos) {
-		wal_path.insert(question_mark_pos, ".wal");
-	} else {
-		wal_path += ".wal";
-	}
-	return wal_path;
+	return "~/thesis/test/db.wal";
+
+	// std::size_t question_mark_pos = std::string::npos;
+	// if (!StringUtil::StartsWith(path, "\\\\?\\")) {
+	// 	question_mark_pos = path.find('?');
+	// }
+	// auto wal_path = path;
+	// if (question_mark_pos != std::string::npos) {
+	// 	wal_path.insert(question_mark_pos, ".wal");
+	// } else {
+	// 	wal_path += ".wal";
+	// }
+	// return wal_path;
 }
 
 bool StorageManager::InMemory() {
@@ -168,7 +170,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		// create a new file
 
 		// check if a WAL file already exists
-		auto wal_path = "~/thesis/test/db.wal"; // GetWALPath();
+		auto wal_path = GetWALPath();
 		if (fs.FileExists(wal_path)) {
 			// WAL file exists but database file does not
 			// remove the WAL
@@ -221,7 +223,7 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 		auto checkpoint_reader = SingleFileCheckpointReader(*this);
 		checkpoint_reader.LoadFromStorage();
 
-		auto wal_path = "~/thesis/test/db.wal"; // GetWALPath();
+		auto wal_path = GetWALPath();
 		wal = WriteAheadLog::Replay(fs, db, wal_path);
 	}
 	if (row_group_size > 122880ULL && GetStorageVersion() < 4) {
