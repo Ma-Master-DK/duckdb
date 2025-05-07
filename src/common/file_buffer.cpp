@@ -110,15 +110,21 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 		xnvme_cli_perr("xnvme_buf_alloc()", errno);
 		goto exit;
 	}
+
 	memset(nvme_buf, 0, nvme_buf_size);
 
-	ctx = xnvme_cmd_ctx_from_dev(dev);
+	for (uint64_t i = 0; i < lba_amount; i++) {
+		auto offset = i * lba_size;
+		auto *payload = nvme_buf + offset;
 
-	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location, lba_amount - 1, nvme_buf, nullptr);
-	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-		xnvme_cli_perr("xnvme_nvm_write()", err);
-		xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-		goto exit;
+		ctx = xnvme_cmd_ctx_from_dev(dev);
+
+		err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
+		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+			goto exit;
+		}
 	}
 
 	memcpy(internal_buffer, nvme_buf, nvme_buf_size);
@@ -135,6 +141,7 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 
 void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+
 	int err;
 	struct xnvme_cmd_ctx ctx;
 
@@ -148,17 +155,21 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 		xnvme_cli_perr("xnvme_buf_alloc()", errno);
 		goto exit;
 	}
-	memset(nvme_buf, 0, nvme_buf_size);
 
 	memcpy(nvme_buf, internal_buffer, nvme_buf_size);
 
-	ctx = xnvme_cmd_ctx_from_dev(dev);
+	for (uint64_t i = 0; i < lba_amount; i++) {
+		auto offset = i * lba_size;
+		auto *payload = nvme_buf + offset;
 
-	err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location, lba_amount - 1, nvme_buf, nullptr);
-	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-		xnvme_cli_perr("xnvme_nvm_write()", err);
-		xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-		goto exit;
+		ctx = xnvme_cmd_ctx_from_dev(dev);
+
+		err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
+		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+			goto exit;
+		}
 	}
 
 exit:
