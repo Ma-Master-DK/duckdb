@@ -98,12 +98,27 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
-	struct xnvme_cmd_ctx ctx;
-	int err;
+	// misc variables for xnvme use
+	struct cb_args args = {0, 0};
+	struct xnvme_queue *queue = nullptr;
+	const int qdepth = 8;
+	int err = 0;
+	int ret = 0;
 
+	// extract meta data from device
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
+
+	// initialize command queue
+	ret = xnvme_queue_init(dev, qdepth, 0, &queue);
+	if (ret) {
+		xnvme_cli_perr("xnvme_queue_init()", errno);
+		return;
+	}
+
+	// set the callback function
+	xnvme_queue_set_cb(queue, cb_fn, &args);
 
 	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
@@ -121,13 +136,32 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 		auto offset = i * lba_size;
 		auto *payload = nvme_buf + offset;
 
-		ctx = xnvme_cmd_ctx_from_dev(dev);
-		err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
-		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-			xnvme_cli_perr("xnvme_nvm_write()", err);
-			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
+
+	submit:
+		err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
+
+		switch (err) {
+		case 0:
+			args.submitted += 1;
+			break;
+
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue, 0);
+			goto submit;
+
+		default:
+			xnvme_cli_perr("xnvme_nvm_read()", err);
 			goto exit;
 		}
+	}
+
+	// all is submitted, now wait for completion
+	ret = xnvme_queue_drain(queue);
+	if (ret < 0) {
+		xnvme_cli_perr("xnvme_queue_drain()", ret);
+		goto exit;
 	}
 
 	// transfer data in dma buffer to duckdb buffer
@@ -146,12 +180,27 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
-	int err;
-	struct xnvme_cmd_ctx ctx;
+	// misc variables for xnvme use
+	struct cb_args args = {0, 0};
+	struct xnvme_queue *queue = nullptr;
+	const int qdepth = 8;
+	int err = 0;
+	int ret = 0;
 
+	// extract meta data from device
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
+
+	// initialize command queue
+	ret = xnvme_queue_init(dev, qdepth, 0, &queue);
+	if (ret) {
+		xnvme_cli_perr("xnvme_queue_init()", errno);
+		return;
+	}
+
+	// set the callback function
+	xnvme_queue_set_cb(queue, cb_fn, &args);
 
 	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
@@ -169,14 +218,32 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 		auto offset = i * lba_size;
 		auto *payload = nvme_buf + offset;
 
-		ctx = xnvme_cmd_ctx_from_dev(dev);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 
-		err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
-		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+	submit:
+		err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
+
+		switch (err) {
+		case 0:
+			args.submitted += 1;
+			break;
+
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue, 0);
+			goto submit;
+
+		default:
 			xnvme_cli_perr("xnvme_nvm_write()", err);
-			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
 			goto exit;
 		}
+	}
+
+	// all is submitted, now wait for completion
+	ret = xnvme_queue_drain(queue);
+	if (ret < 0) {
+		xnvme_cli_perr("xnvme_queue_drain()", ret);
+		goto exit;
 	}
 
 exit:

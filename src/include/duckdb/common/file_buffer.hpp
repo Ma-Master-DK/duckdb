@@ -11,6 +11,7 @@
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/debug_initialize.hpp"
 
+#include <cstdint>
 #include <libxnvme.h>
 
 namespace duckdb {
@@ -88,6 +89,26 @@ protected:
 
 	void ReallocBuffer(idx_t new_size);
 	void Init();
+
+	struct cb_args {
+		uint32_t submitted;
+		uint32_t completed;
+	};
+
+	static void cb_fn(struct xnvme_cmd_ctx *ctx, void *args) {
+		struct cb_args *cb_args = static_cast<struct cb_args *>(args);
+
+		// log whether command succeeded or not
+		if (xnvme_cmd_ctx_cpl_status(ctx)) {
+			xnvme_cli_pinf("Command failed.");
+			xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
+		} else {
+			cb_args->completed += 1;
+		}
+
+		// put command context back on queue after processing
+		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+	}
 };
 
 } // namespace duckdb
