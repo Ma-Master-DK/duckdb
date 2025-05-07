@@ -97,6 +97,7 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 
 void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
+
 	struct xnvme_cmd_ctx ctx;
 	int err;
 
@@ -104,6 +105,7 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
 
+	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
 	char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
 	if (!nvme_buf) {
@@ -111,14 +113,15 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 		goto exit;
 	}
 
-	memset(nvme_buf, 0, nvme_buf_size);
+	// clear buffer before writing to it, maybe not necessary
+	xnvme_buf_clear(nvme_buf, nvme_buf_size);
 
+	// read one lba block at a time, sequentially, into dma buffer
 	for (uint64_t i = 0; i < lba_amount; i++) {
 		auto offset = i * lba_size;
 		auto *payload = nvme_buf + offset;
 
 		ctx = xnvme_cmd_ctx_from_dev(dev);
-
 		err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
 		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
 			xnvme_cli_perr("xnvme_nvm_write()", err);
@@ -127,6 +130,7 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 		}
 	}
 
+	// transfer data in dma buffer to duckdb buffer
 	memcpy(internal_buffer, nvme_buf, nvme_buf_size);
 
 exit:
@@ -149,6 +153,7 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
 
+	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
 	char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
 	if (!nvme_buf) {
@@ -156,8 +161,10 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 		goto exit;
 	}
 
+	// transfer data from duckdb buffer to dma buffer
 	memcpy(nvme_buf, internal_buffer, nvme_buf_size);
 
+	// write one lba block at a time, sequentially, to disk from dma buffer
 	for (uint64_t i = 0; i < lba_amount; i++) {
 		auto offset = i * lba_size;
 		auto *payload = nvme_buf + offset;
