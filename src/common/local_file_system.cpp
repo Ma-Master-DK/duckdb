@@ -655,9 +655,14 @@ void LocalFileSystem::RemoveDirectory(const string &directory, optional_ptr<File
 }
 
 void LocalFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
-	auto normalized_file = NormalizeLocalPath(filename);
+	string file = filename;
+	if (filename[0] == '~') {
+		const char *home = getenv("HOME");
+		file = std::string(home) + filename.substr(1);
+	}
+	auto normalized_file = NormalizeLocalPath(file);
 	if (std::remove(normalized_file) != 0) {
-		throw IOException("Could not remove file \"%s\": %s", {{"errno", std::to_string(errno)}}, filename,
+		throw IOException("Could not remove file \"%s\": %s", {{"errno", std::to_string(errno)}}, file,
 		                  strerror(errno));
 	}
 }
