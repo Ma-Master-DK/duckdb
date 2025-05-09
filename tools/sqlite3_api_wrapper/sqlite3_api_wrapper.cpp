@@ -113,6 +113,9 @@ int sqlite3_open_v2(const char *filename, /* Database filename (UTF-8) */
 		if (flags & SQLITE_OPEN_READONLY) {
 			config.options.access_mode = AccessMode::READ_ONLY;
 		}
+		if (flags & SQLITE_OPEN_NEW) {
+			config.options.new_db = true;
+		}
 		if (flags & DUCKDB_UNSIGNED_EXTENSIONS) {
 			config.options.allow_unsigned_extensions = true;
 		}

@@ -123,6 +123,7 @@ protected:
 };
 
 struct DBConfigOptions {
+	bool new_db = false;
 	//! Database file path. May be empty for in-memory mode
 	string database_path;
 	//! Database type. If empty, automatically extracted from `database_path`, where a `type:path` syntax is expected
@@ -135,6 +136,7 @@ struct DBConfigOptions {
 	bool use_direct_io = false;
 	//! Whether extensions should be loaded on start-up
 	bool load_extensions = true;
+	//! Whether to overwrite the existing database
 #ifdef DUCKDB_EXTENSION_AUTOLOAD_DEFAULT
 	//! Whether known extensions are allowed to be automatically loaded when a query depends on them
 	bool autoload_known_extensions = DUCKDB_EXTENSION_AUTOLOAD_DEFAULT;

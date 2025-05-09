@@ -165,7 +165,6 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	// Check if the database file already exists.
 	// Note: a file can also exist if there was a ROLLBACK on a previous transaction creating that file.
 	// if (!read_only && !fs.FileExists(path)) {
-	if (false) {
 		// file does not exist and we are in read-write mode
 		// create a new file
 

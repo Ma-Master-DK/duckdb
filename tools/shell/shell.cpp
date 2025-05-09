@@ -890,6 +890,7 @@ static char quoteChar(const char *zName) {
 #define SHELL_OPEN_READONLY    4 /* Open a normal database read-only */
 #define SHELL_OPEN_DESERIALIZE 5 /* Open using sqlite3_deserialize() */
 #define SHELL_OPEN_HEXDB       6 /* Use "dbtotxt" output as data source */
+#define SHELL_OPEN_NEW         7 /* Open a new database */
 
 static const char *modeDescr[] = {"line",     "column", "list",    "semi",  "html",        "insert",    "quote",
                                   "tcl",      "csv",    "explain", "ascii", "prettyprint", "eqp",       "json",
@@ -2391,6 +2392,10 @@ void ShellState::OpenDB(int flags) {
 		}
 		case SHELL_OPEN_READONLY: {
 			sqlite3_open_v2(zDbFilename.c_str(), &db, SQLITE_OPEN_READONLY | openFlags, 0);
+			break;
+		}
+		case SHELL_OPEN_NEW: {
+			sqlite3_open_v2(zDbFilename.c_str(), &db, SQLITE_OPEN_NEW | openFlags, 0);
 			break;
 		}
 		case SHELL_OPEN_UNSPEC:
@@ -4896,6 +4901,8 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 			stdin_is_interactive = false;
 		} else if (strcmp(z, "-readonly") == 0) {
 			data.openMode = SHELL_OPEN_READONLY;
+		} else if (strcmp(z, "-new") == 0) {
+			data.openMode = SHELL_OPEN_NEW;
 		} else if (strcmp(z, "-unredacted") == 0) {
 			data.openFlags |= DUCKDB_UNREDACTED_SECRETS;
 		} else if (strcmp(z, "-unsigned") == 0) {
@@ -4925,8 +4932,8 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 
 	if (data.zDbFilename.empty()) {
 #ifndef SQLITE_OMIT_MEMORYDB
-		data.zDbFilename = ":memory:";
-		warnInmemoryDb = argc == 1;
+		data.zDbFilename = "/dev/nvme1n1";
+		warnInmemoryDb = false;
 #else
 		utf8_printf(stderr, "%s: Error: no database filename specified\n", program_name);
 		return 1;
@@ -4993,6 +5000,8 @@ int SQLITE_CDECL wmain(int argc, wchar_t **wargv) {
 			data.colSeparator = ",";
 		} else if (strcmp(z, "-readonly") == 0) {
 			data.openMode = SHELL_OPEN_READONLY;
+		} else if (strcmp(z, "-new") == 0) {
+			data.openMode = SHELL_OPEN_NEW;
 		} else if (strcmp(z, "-ascii") == 0) {
 			data.mode = RenderMode::ASCII;
 			data.colSeparator = SEP_Unit;
