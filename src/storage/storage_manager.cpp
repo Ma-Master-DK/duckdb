@@ -74,7 +74,7 @@ void StorageManager::ResetWAL() {
 string StorageManager::GetWALPath() {
 	// we append the ".wal" **before** a question mark in case of GET parameters
 	// but only if we are not in a windows long path (which starts with \\?\)
-	return "~/thesis/test/db.wal";
+	return "~/db.wal";
 
 	// std::size_t question_mark_pos = std::string::npos;
 	// if (!StringUtil::StartsWith(path, "\\\\?\\")) {
