@@ -165,8 +165,9 @@ void SingleFileStorageManager::LoadDatabase(StorageOptions storage_options) {
 	// Check if the database file already exists.
 	// Note: a file can also exist if there was a ROLLBACK on a previous transaction creating that file.
 	// if (!read_only && !fs.FileExists(path)) {
-		// file does not exist and we are in read-write mode
-		// create a new file
+	// file does not exist and we are in read-write mode
+	// create a new file
+	if (config.options.new_db) {
 
 		// check if a WAL file already exists
 		auto wal_path = GetWALPath();
