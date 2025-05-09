@@ -204,6 +204,8 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 
 void SingleFileBlockManager::CreateNewDatabase() {
 	xnvme_opts opts = xnvme_opts_default();
+	opts.be = "linux";
+	opts.async = "io_uring";
 	dev = xnvme_dev_open(path.c_str(), &opts);
 	if (!dev) {
 		xnvme_cli_perr("xnvme_dev_open()", errno);
@@ -264,6 +266,8 @@ void SingleFileBlockManager::CreateNewDatabase() {
 
 void SingleFileBlockManager::LoadExistingDatabase() {
 	xnvme_opts opts = xnvme_opts_default();
+	opts.be = "linux";
+	opts.async = "io_uring";
 	dev = xnvme_dev_open(path.c_str(), &opts);
 	if (!dev) {
 		xnvme_cli_perr("xnvme_dev_open()", errno);
