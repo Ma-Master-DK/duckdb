@@ -29,6 +29,7 @@ public:
 	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint64_t amount, char *payload);
 	int GetID();
 	int Drain();
+	void Close();
 	~QueueWrapper();
 
 protected:
@@ -45,7 +46,7 @@ public:
 	QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth);
 	~QueuePool() {};
 	QueueWrapper *GetAvailableQueue();
-	void ReleaseQueue(QueueWrapper *qwrap);
+	void Close();
 
 private:
 	static int nr_of_queues;

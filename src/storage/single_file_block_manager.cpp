@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <libxnvme.h>
 
 namespace duckdb {
@@ -161,7 +162,10 @@ SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const strin
 }
 
 SingleFileBlockManager::~SingleFileBlockManager() {
+	qpool->Close();
+	std::cout << "Closed the queue pool!\n";
 	xnvme_dev_close(dev);
+	std::cout << "Closed device!\n";
 }
 
 FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {

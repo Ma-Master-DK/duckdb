@@ -28,6 +28,13 @@ QueueWrapper *QueuePool::GetAvailableQueue() {
 	return nullptr;
 }
 
+void QueuePool::Close() {
+	for (auto &qwrap_ptr : queues) {
+		auto &qwrap = *qwrap_ptr;
+		qwrap.Close();
+	}
+}
+
 QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
 	this->id = id;
 	int ret = xnvme_queue_init(dev, qdepth, 0, &queue);
@@ -98,9 +105,17 @@ submit:
 	return err;
 }
 
+void QueueWrapper::Close() {
+	if (queue) {
+		xnvme_queue_term(queue);
+		queue = nullptr;
+	}
+}
+
 QueueWrapper::~QueueWrapper() {
 	if (queue) {
 		xnvme_queue_term(queue);
+		queue = nullptr;
 	}
 }
 
