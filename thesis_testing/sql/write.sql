@@ -3,5 +3,5 @@ CREATE TABLE people (
         age INTEGER
 );
 
-COPY people FROM "/home/k/thesis/test/data.csv";
+COPY people FROM "./data/data.csv";
 

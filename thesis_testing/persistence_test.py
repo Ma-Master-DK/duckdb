@@ -41,8 +41,8 @@ def file_read_write_test(db_file, verbose):
 
 
 def nvme_read_write_test(verbose):
-    cw = wrap(f"sudo {duckdb_nvme} -new -f {sql_write} {nvme_dev}", verbose)
-    cr = wrap(f"sudo {duckdb_nvme} -f {sql_read} {nvme_dev}", verbose)
+    cw = wrap(f"{duckdb_nvme} -new -f {sql_write} {nvme_dev}", verbose)
+    cr = wrap(f"{duckdb_nvme} -f {sql_read} {nvme_dev}", verbose)
 
     return cw.returncode & cr.returncode
 
@@ -95,14 +95,14 @@ class Tester:
 
 if __name__ == "__main__":
     print("Running Persistence Tests...")
-    tester = Tester(timer=True, verbose=False)
+    tester = Tester(timer=True, verbose=True)
 
     print("\tStandard DuckDB, using files")
-    for i in range(10):
+    for i in range(1):
         tester.run_file(file_read_write_test)
 
     print("\tModified DuckDB, using nvme")
-    for i in range(10):
+    for i in range(1):
         tester.run_nvme(nvme_read_write_test)
 
     print("\nTest Finished.")
