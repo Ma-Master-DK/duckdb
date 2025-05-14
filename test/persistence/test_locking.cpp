@@ -22,15 +22,17 @@ TEST_CASE("Test write lock with multiple processes", "[persistence][.]") {
 	    (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
 	*count = 0;
 
-	string dbdir = TestCreatePath("writelocktest");
-	DeleteDatabase(dbdir);
+	DBConfig config;
+	config.options.new_db = true;
+	string dbdir = "/dev/nvme1n1";
+	// DeleteDatabase(dbdir);
 	// test write lock
 	// fork away a child
 	pid_t pid = fork();
 	if (pid == 0) {
 		// child process
 		// open db for writing
-		DuckDB db(dbdir);
+		DuckDB db(dbdir, &config);
 		Connection con(db);
 		// opened db for writing
 		// insert some values
@@ -62,20 +64,22 @@ TEST_CASE("Test read lock with multiple processes", "[persistence][.]") {
 	    (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, 0, 0);
 	*count = 0;
 
-	string dbdir = TestCreatePath("readlocktest");
-	DeleteDatabase(dbdir);
+	DBConfig config;
+	config.options.new_db = true;
+	string dbdir = "/dev/nvme1n1";
+	// DeleteDatabase(dbdir);
 
 	// create the database
 	{
-		DuckDB db(dbdir);
+		DuckDB db(dbdir, &config);
 		Connection con(db);
 		REQUIRE_NO_FAIL(con.Query("CREATE TABLE a(i INTEGER)"));
 		REQUIRE_NO_FAIL(con.Query("INSERT INTO a VALUES (42)"));
 	}
 	// test read lock
 	pid_t pid = fork();
-	DBConfig config;
 	config.options.access_mode = AccessMode::READ_ONLY;
+	config.options.new_db = false;
 	if (pid == 0) {
 		// child process
 		// open db for reading

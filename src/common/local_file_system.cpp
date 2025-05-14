@@ -380,8 +380,7 @@ unique_ptr<FileHandle> LocalFileSystem::OpenFile(const string &path_p, FileOpenF
 	}
 #endif
 
-	if (flags.Lock() != FileLockType::NO_LOCK) {
-		// set lock on file
+	if (flags.Lock() != FileLockType::NO_LOCK) { // set lock on file
 		// but only if it is not an input/output stream
 		auto file_type = GetFileTypeInternal(fd);
 		if (file_type != FileType::FILE_TYPE_FIFO && file_type != FileType::FILE_TYPE_SOCKET) {

@@ -16,11 +16,13 @@ TEST_CASE("Test that sequence never returns the same value twice even with abort
 	// disabled test for now
 	return;
 
-	string dbdir = TestCreatePath("defaultseq");
-	DeleteDatabase(dbdir);
+	DBConfig config;
+	config.options.new_db = true;
+	string dbdir = "/dev/nvme1n1";
+	// DeleteDatabase(dbdir);
 	// create a database
 	{
-		DuckDB db(dbdir);
+		DuckDB db(dbdir, &config);
 		Connection con(db);
 		REQUIRE_NO_FAIL(con.Query("CREATE SEQUENCE seq"));
 		REQUIRE_NO_FAIL(con.Query("CREATE TABLE a (i INTEGER DEFAULT nextval('seq'), j INTEGER)"));
@@ -82,11 +84,13 @@ TEST_CASE("Test that sequence never returns the same value twice even with abort
 	// disabled test for now
 	return;
 
-	string dbdir = TestCreatePath("defaultseqconcurrent");
-	DeleteDatabase(dbdir);
+	DBConfig config;
+	config.options.new_db = true;
+	string dbdir = "/dev/nvme1n1";
+	// DeleteDatabase(dbdir);
 	// create a database
 	{
-		DuckDB db(dbdir);
+		DuckDB db(dbdir, &config);
 		Connection con(db);
 		REQUIRE_NO_FAIL(con.Query("CREATE SEQUENCE seq"));
 		REQUIRE_NO_FAIL(con.Query("CREATE TABLE a (i INTEGER DEFAULT nextval('seq'), j INTEGER)"));
@@ -102,8 +106,9 @@ TEST_CASE("Test that sequence never returns the same value twice even with abort
 			for (size_t i = 0; i < 8; i++) {
 				write_threads[i] = thread(write_entries_to_table, &db, i);
 			}
-			while (true)
+			while (true) {
 				;
+			}
 		} else if (pid > 0) {
 			// parent process, sleep a bit
 			usleep(100000);

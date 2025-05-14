@@ -26,10 +26,12 @@ TEST_CASE("Test transactional integrity when facing process aborts", "[persisten
 		fs->RemoveDirectory(db_folder_parent);
 	}
 	fs->CreateDirectory(db_folder_parent);
+	DBConfig config;
+	config.options.new_db = true;
 
-	string db_folder = fs->JoinPath(db_folder_parent, "dbfolder");
+	string db_folder = "/dev/nvme1n1";
 	{
-		DuckDB db(db_folder);
+		DuckDB db(db_folder, &config);
 		Connection con(db);
 		con.Query("CREATE TABLE a (i INTEGER)");
 	}

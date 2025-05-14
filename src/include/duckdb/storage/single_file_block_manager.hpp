@@ -17,6 +17,7 @@
 #include "duckdb/main/config.hpp"
 
 #include <libxnvme.h>
+#include <fcntl.h>
 
 namespace duckdb {
 
@@ -123,6 +124,8 @@ private:
 	string path;
 	//! The file handle
 	xnvme_dev *dev;
+	int lock_fd;
+	struct flock fl;
 	unique_ptr<QueuePool> qpool;
 	//! The buffer used to read/write to the headers
 	FileBuffer header_buffer;

@@ -16,6 +16,8 @@
 #include <cstring>
 #include <iostream>
 #include <libxnvme.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace duckdb {
 
@@ -163,9 +165,10 @@ SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const strin
 
 SingleFileBlockManager::~SingleFileBlockManager() {
 	qpool->Close();
-	std::cout << "Closed the queue pool!\n";
+	if (lock_fd != 0) {
+		close(lock_fd);
+	}
 	xnvme_dev_close(dev);
-	std::cout << "Closed device!\n";
 }
 
 FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {
@@ -208,6 +211,34 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 
 void SingleFileBlockManager::CreateNewDatabase() {
 	xnvme_opts opts = xnvme_opts_default();
+	lock_fd = open("/dev/nvme1n1", O_RDWR);
+	memset(&fl, 0, sizeof fl);
+	fl.l_whence = SEEK_SET;
+	fl.l_start = 0;
+	fl.l_len = 0;
+	if (options.read_only) {
+		opts.rdwr = 0;
+		opts.rdonly = 1;
+		fl.l_type = F_RDLCK;
+	} else {
+		fl.l_type = F_WRLCK;
+	}
+	int rc = fcntl(lock_fd, F_SETLK, &fl);
+	bool has_error = rc == -1;
+	string error_string = "";
+	if (rc == -1) {
+		error_string += "Failed to set lock. The database is probably already locked!\n";
+	}
+	if (has_error) {
+		rc = close(lock_fd);
+		if (rc == -1) {
+			error_string += "Also failed to close file!";
+		}
+		throw IOException(error_string);
+	}
+	if (options.use_direct_io) {
+		opts.direct = 1;
+	}
 	opts.be = "linux";
 	opts.async = "io_uring";
 	dev = xnvme_dev_open(path.c_str(), &opts);

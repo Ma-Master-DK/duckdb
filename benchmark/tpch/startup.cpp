@@ -7,7 +7,7 @@ using namespace duckdb;
 #define SF 1
 
 #define TPCHStartup(QUERY)                                                                                             \
-	string db_path = "duckdb_benchmark_db.db";                                                                         \
+	string db_path = "/dev/nvme1n1";                                                                                   \
 	void Load(DuckDBBenchmarkState *state) override {                                                                  \
 		DeleteDatabase(db_path);                                                                                       \
 		{                                                                                                              \

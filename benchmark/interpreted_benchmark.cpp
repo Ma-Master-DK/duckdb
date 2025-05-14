@@ -57,6 +57,7 @@ struct InterpretedBenchmarkState : public BenchmarkState {
 			result->options.serialization_compatibility = SerializationCompatibility::FromString(version);
 		}
 		result->options.load_extensions = false;
+		result->options.new_db = true;
 		return result;
 	}
 };
@@ -563,15 +564,15 @@ void InterpretedBenchmark::Cleanup(BenchmarkState *state_p) {
 }
 
 string InterpretedBenchmark::GetDatabasePath() {
-	auto fs = FileSystem::CreateLocal();
-	if (!cache_db.empty()) {
-		return fs->JoinPath(BenchmarkRunner::DUCKDB_BENCHMARK_DIRECTORY, cache_db);
-	}
-	if (in_memory) {
-		return "";
-	}
-	auto db_path = fs->JoinPath(BenchmarkRunner::DUCKDB_BENCHMARK_DIRECTORY, DEFAULT_DB_PATH);
-	DeleteDatabase(db_path);
+	// auto fs = FileSystem::CreateLocal();
+	// if (!cache_db.empty()) {
+	// 	return fs->JoinPath(BenchmarkRunner::DUCKDB_BENCHMARK_DIRECTORY, cache_db);
+	// }
+	// if (in_memory) {
+	// 	return "";
+	// }
+	auto db_path = "/dev/nvme1n1";
+	// DeleteDatabase(db_path);
 	return db_path;
 }
 
