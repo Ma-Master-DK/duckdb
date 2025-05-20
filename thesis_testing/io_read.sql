@@ -1,0 +1,1 @@
+EXPLAIN ANALYZE SELECT COUNT(*), SUM(LENGTH(payload)) FROM io_test;
