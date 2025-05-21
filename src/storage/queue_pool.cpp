@@ -18,11 +18,19 @@ QueuePool::QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth) {
 }
 
 QueueWrapper *QueuePool::GetAvailableQueue() {
-	for (auto &qwrap_ptr : queues) {
-		auto &qwrap = *qwrap_ptr;
-		if (qwrap.TryLock()) {
-			std::cout << "Got queue number: " << qwrap.GetID() << "\n";
-			return &qwrap;
+	while (true) {
+		for (auto &qwrap_ptr : queues) {
+			auto &qwrap = *qwrap_ptr;
+			if (qwrap.TryLock()) {
+				std::cout << "Got queue number: " << qwrap.GetID() << "\n";
+				return &qwrap;
+			}
+		}
+
+		std::cout << "Poking all queues!\n";
+		for (auto &qwrap_ptr : queues) {
+			auto &qwrap = *qwrap_ptr;
+			qwrap.Poke();
 		}
 	}
 	return nullptr;
@@ -35,8 +43,17 @@ void QueuePool::Close() {
 	}
 }
 
+void QueuePool::Sync() {
+	for (auto &qwrap_ptr : queues) {
+		auto &qwrap = *qwrap_ptr;
+		qwrap.Drain();
+	}
+	std::cout << "Drained all queues\n";
+}
+
 QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
 	this->id = id;
+	this->qdepth = qdepth;
 	int ret = xnvme_queue_init(dev, qdepth, 0, &queue);
 	if (ret) {
 		xnvme_cli_perr("xnvme_queue_init()", errno);
@@ -51,7 +68,16 @@ void QueueWrapper::Release() {
 }
 
 bool QueueWrapper::TryLock() {
-	return mtx.try_lock();
+	if (mtx.try_lock()) {
+		if (args.inflight < qdepth) {
+			return true;
+		} else {
+			std::cout << "Queue " << id << " is filled, but not locked!\n";
+			mtx.unlock();
+			return false;
+		}
+	}
+	return false;
 }
 
 int QueueWrapper::GetID() {
@@ -62,15 +88,20 @@ int QueueWrapper::Drain() {
 	return xnvme_queue_drain(queue);
 }
 
-int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint64_t amount, char *payload) {
+void QueueWrapper::Poke() {
+	xnvme_queue_poke(queue, 0);
+}
+
+int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload) {
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 	int err;
 
 submit:
-	err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, 0, payload, nullptr);
+	err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
 	switch (err) {
 	case 0:
-		submitted += 1;
+		args.submitted++;
+		args.inflight++;
 		break;
 
 	case -EBUSY:
@@ -83,15 +114,16 @@ submit:
 	}
 	return err;
 }
-int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint64_t amount, char *payload) {
+int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload) {
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 	int err;
 
 submit:
-	err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, 0, payload, nullptr);
+	err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
 	switch (err) {
 	case 0:
-		submitted += 1;
+		args.submitted++;
+		args.inflight++;
 		break;
 
 	case -EBUSY:
