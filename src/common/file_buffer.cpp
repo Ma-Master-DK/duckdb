@@ -6,11 +6,13 @@
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/storage/storage_info.hpp"
+#include "duckdb/storage/queue_pool.hpp"
 #include <cstdint>
 #include <cstring>
 
 #include <libxnvme.h>
 #include <libxnvme_nvm.h>
+#include <thread>
 
 namespace duckdb {
 
@@ -95,13 +97,15 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	handle.Read(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
+void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// misc variables for xnvme use
-	struct cb_args args = {0, 0};
-	struct xnvme_queue *queue = nullptr;
-	const int qdepth = 8;
+	QueueWrapper *qwrap;
+	while (!(qwrap = qpool.GetAvailableQueue())) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+
 	int err = 0;
 	int ret = 0;
 
@@ -109,16 +113,6 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
-
-	// initialize command queue
-	ret = xnvme_queue_init(dev, qdepth, 0, &queue);
-	if (ret) {
-		xnvme_cli_perr("xnvme_queue_init()", errno);
-		return;
-	}
-
-	// set the callback function
-	xnvme_queue_set_cb(queue, cb_fn, &args);
 
 	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
@@ -135,30 +129,15 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	for (uint64_t i = 0; i < lba_amount; i++) {
 		auto offset = i * lba_size;
 		auto *payload = nvme_buf + offset;
-
-		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-
-	submit:
-		err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
-
-		switch (err) {
-		case 0:
-			args.submitted += 1;
-			break;
-
-		case -EBUSY:
-		case -EAGAIN:
-			xnvme_queue_poke(queue, 0);
-			goto submit;
-
-		default:
-			xnvme_cli_perr("xnvme_nvm_read()", err);
+		err = qwrap->SubmitRead(dev, lba_location + i, 0, payload);
+		if (err) {
 			goto exit;
 		}
 	}
 
 	// all is submitted, now wait for completion
-	ret = xnvme_queue_drain(queue);
+	ret = qwrap->Drain();
+	qwrap->Release();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
@@ -177,30 +156,25 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	handle.Write(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
+void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// misc variables for xnvme use
-	struct cb_args args = {0, 0};
-	struct xnvme_queue *queue = nullptr;
-	const int qdepth = 8;
+	QueueWrapper *qwrap;
+	while (!(qwrap = qpool.GetAvailableQueue())) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
 	int err = 0;
 	int ret = 0;
 
 	// extract meta data from device
-	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
+	auto geo = xnvme_dev_get_geo(dev);
+	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
 	auto lba_amount = internal_size / lba_size;
-
-	// initialize command queue
-	ret = xnvme_queue_init(dev, qdepth, 0, &queue);
-	if (ret) {
-		xnvme_cli_perr("xnvme_queue_init()", errno);
-		return;
-	}
-
-	// set the callback function
-	xnvme_queue_set_cb(queue, cb_fn, &args);
+	auto mdts_size = geo->mdts_nbytes;
+	auto lbas_pr_mdts = mdts_size / lba_size;
+	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
 	// allocate dma buffer
 	auto nvme_buf_size = lba_size * lba_amount;
@@ -214,37 +188,27 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	memcpy(nvme_buf, internal_buffer, nvme_buf_size);
 
 	// write one lba block at a time, sequentially, to disk from dma buffer
-	for (uint64_t i = 0; i < lba_amount; i++) {
-		auto offset = i * lba_size;
+	for (uint64_t i = 0; i < submissions; i++) {
+		auto offset = i * mdts_size;
 		auto *payload = nvme_buf + offset;
+		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-
-	submit:
-		err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location + i, 0, payload, nullptr);
-
-		switch (err) {
-		case 0:
-			args.submitted += 1;
-			break;
-
-		case -EBUSY:
-		case -EAGAIN:
-			xnvme_queue_poke(queue, 0);
-			goto submit;
-
-		default:
-			xnvme_cli_perr("xnvme_nvm_write()", err);
+		err = qwrap->SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		if (err) {
 			goto exit;
 		}
 	}
 
-	// all is submitted, now wait for completion
-	ret = xnvme_queue_drain(queue);
+	// all is submitted, DO NOT DRAIN
+	ret = qwrap->Drain();
+	qwrap->Release();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
 	}
+
+	// transfer data in dma buffer to duckdb buffer
+	memcpy(internal_buffer, nvme_buf, nvme_buf_size);
 
 exit:
 	xnvme_buf_free(dev, nvme_buf);
