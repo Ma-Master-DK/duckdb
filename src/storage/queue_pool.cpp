@@ -22,12 +22,10 @@ QueueWrapper *QueuePool::GetAvailableQueue() {
 		for (auto &qwrap_ptr : queues) {
 			auto &qwrap = *qwrap_ptr;
 			if (qwrap.TryLock()) {
-				std::cout << "Got queue number: " << qwrap.GetID() << "\n";
 				return &qwrap;
 			}
 		}
 
-		std::cout << "Poking all queues!\n";
 		for (auto &qwrap_ptr : queues) {
 			auto &qwrap = *qwrap_ptr;
 			qwrap.Poke();
@@ -48,7 +46,6 @@ void QueuePool::Sync() {
 		auto &qwrap = *qwrap_ptr;
 		qwrap.Drain();
 	}
-	std::cout << "Drained all queues\n";
 }
 
 QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
@@ -64,7 +61,6 @@ QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
 
 void QueueWrapper::Release() {
 	mtx.unlock();
-	std::cout << "Released queue number: " << id << "\n";
 }
 
 bool QueueWrapper::TryLock() {
@@ -72,7 +68,6 @@ bool QueueWrapper::TryLock() {
 		if (args.inflight < qdepth) {
 			return true;
 		} else {
-			std::cout << "Queue " << id << " is filled, but not locked!\n";
 			mtx.unlock();
 			return false;
 		}
