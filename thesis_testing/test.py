@@ -83,15 +83,11 @@ class Tester:
 
         # execute SQL against db
         # adds an 'exit' statement for DuckDB to exit session after SQL
-        sql_cmd = f"CALL dbgen(sf={self._scale_factor});" + "\n.exit"
-        proc.stdin.write(sql_cmd.encode("utf-8"))
-        proc.stdin.flush()
+        sql_cmd = ".mode trash\n" + f"CALL dbgen(sf={self._scale_factor});" + "\n.exit"
+        stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
 
         sql_time = time.perf_counter()
         self._write_times.insert(0, sql_time - start_time)
-
-        # wait for child process to stop
-        stdout, stderr = proc.communicate()
 
         if stderr:
             print("\t\tFAILED")
@@ -120,15 +116,11 @@ class Tester:
 
         # execute SQL against db
         # adds an 'exit' statement for DuckDB to exit session after SQL
-        sql_cmd = sql + "\n.exit"
-        proc.stdin.write(sql_cmd.encode("utf-8"))
-        proc.stdin.flush()
+        sql_cmd = ".mode trash\n" + sql + "\n.exit"
+        stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
 
         sql_time = time.perf_counter()
         self._read_times.insert(0, sql_time - start_time)
-
-        # wait for child process to stop
-        stdout, stderr = proc.communicate()
 
         if stderr:
             print("\t\tFAILED")
