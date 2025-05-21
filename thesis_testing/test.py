@@ -4,11 +4,20 @@ import subprocess
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 # general use
 cur_dir = Path(".")
-nvme_dev = "/dev/nvme1n1"
-test_amount = 10
-verbose = True
+verbose = False
+
+# db configuration
+file_db = cur_dir / "test.db"
+nvme_db = "/dev/nvme1n1"
+
+# test meta information
+test_amount = 3
+test_scales = [0.01, 0.1, 1]
 
 # these are the builds of DuckDB we need for testing
 duckdb_file = cur_dir / "builds/duckdb_file"
@@ -18,46 +27,53 @@ if not (duckdb_file.exists() and duckdb_nvme.exists()):
     exit()
 
 # sql files, THIS MIGHT NEED REWORKING
-sql_write = cur_dir / "sql/write.sql"
 sql_read = cur_dir / "sql/read.sql"
-if not (sql_write.exists() and sql_read.exists()):
-    print("Could not find sql files.")
+if not (sql_read.exists()):
+    print("Could not find sql file.")
     exit()
 
 
 class Tester:
-    def __init__(self):
+    def __init__(self, build, db, scale_factor):
         """
         Initialize 'Tester' Class.
 
         We use file_times and nvme_times to store timers for each
         build, respectively
         """
-        self._file_times = []
-        self._nvme_times = []
+
+        # configuration of DuckDB
+        self._build = build
+        self._db = db
+
+        # scale factor for generating test data
+        self._scale_factor = scale_factor
+
+        # time logs for read/write
+        self._read_times = []
+        self._write_times = []
 
     def get_result(self):
         """
         Get the result from the internal timers.
         """
-        print(
-            f"\tFileTimer: {statistics.mean(self._file_times)}\n\tNvmeTimer: {statistics.mean(self._nvme_times)}"
-        )
 
-    def run_file(self, sql, new_db):
+        read = statistics.mean(self._read_times)
+        write = statistics.mean(self._write_times)
+
+        print(f"\t\t\tRead:  {read: .9f}\n\t\t\tWrite: {write: .9f}")
+
+        return read, write
+
+    def test_write(self, sql, new_db=""):
         """
-        Runs the given SQL against the file build of DuckDB.
+        Runs the given SQL against the specified build of DuckDB
         """
 
-        # temporary db file
-        tmp_db = (cur_dir / "test.db").absolute()
-        if new_db and tmp_db.exists():
-            os.remove(tmp_db)
-
-        # start a DuckDB session against the specified db
+        # start a DuckDB session against the db
         # runs in a child process
         proc = subprocess.Popen(
-            [duckdb_file, tmp_db],
+            [self._build, new_db, self._db],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -67,13 +83,12 @@ class Tester:
 
         # execute SQL against db
         # adds an 'exit' statement for DuckDB to exit session after SQL
-        sql_cmd = sql + "\n.exit"
+        sql_cmd = f"CALL dbgen(sf={self._scale_factor});" + "\n.exit"
         proc.stdin.write(sql_cmd.encode("utf-8"))
         proc.stdin.flush()
 
-        end_time = time.perf_counter()
-        elapsed = end_time - start_time
-        self._file_times.insert(0, elapsed)
+        sql_time = time.perf_counter()
+        self._write_times.insert(0, sql_time - start_time)
 
         # wait for child process to stop
         stdout, stderr = proc.communicate()
@@ -87,15 +102,15 @@ class Tester:
                 stderr.decode("utf-8").strip(),
             )
 
-    def run_nvme(self, sql, new_db):
+    def test_read(self, sql):
         """
-        Runs the given SQL against the nvme build of DuckDB
+        Runs the given SQL against the specified build of DuckDB
         """
 
-        # start a DuckDB session against the nvme db
+        # start a DuckDB session against the db
         # runs in a child process
         proc = subprocess.Popen(
-            [duckdb_nvme, new_db, nvme_dev],
+            [self._build, self._db],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -109,9 +124,8 @@ class Tester:
         proc.stdin.write(sql_cmd.encode("utf-8"))
         proc.stdin.flush()
 
-        end_time = time.perf_counter()
-        elapsed = end_time - start_time
-        self._nvme_times.insert(0, elapsed)
+        sql_time = time.perf_counter()
+        self._read_times.insert(0, sql_time - start_time)
 
         # wait for child process to stop
         stdout, stderr = proc.communicate()
@@ -124,27 +138,79 @@ class Tester:
                 stdout.decode("utf-8").strip(),
                 stderr.decode("utf-8").strip(),
             )
+
+
+def run_tests():
+    read_results = {}
+    write_results = {}
+
+    # load sql to execute against db
+    with open(sql_read) as f:
+        sql = f.read()
+
+    print("Running Tests..")
+
+    for scale_factor in test_scales:
+        read_results[scale_factor] = []
+        write_results[scale_factor] = []
+
+        print(f"\n\tTesting for scale factor: {scale_factor}")
+
+        # test for standard DuckDB
+        print("\t\tStandard DuckDB, file")
+        file_tester = Tester(duckdb_file, file_db, scale_factor)
+        for i in range(test_amount):
+            if file_db.exists():
+                os.remove(file_db)
+
+            file_tester.test_write(sql)
+            file_tester.test_read(sql)
+
+        read, write = file_tester.get_result()
+        read_results[scale_factor].append(read)
+        write_results[scale_factor].append(write)
+
+        # test for modified DuckDB, nvme
+        print("\t\tModified DuckDB, nvme")
+        nvme_tester = Tester(duckdb_nvme, nvme_db, scale_factor)
+        for i in range(test_amount):
+            nvme_tester.test_write(sql, "-new")
+            nvme_tester.test_read(sql)
+
+        read, write = nvme_tester.get_result()
+        read_results[scale_factor].append(read)
+        write_results[scale_factor].append(write)
+
+    return read_results, write_results
+
+
+def plot_results(title, results):
+    labels = list(results.keys())
+    y1, y2 = map(list, zip(*results.values()))
+
+    x = np.arange(len(labels))
+    width = 0.35
+
+    # plot
+    fix, ax = plt.subplots()
+    _ = ax.bar(x - width / 2, y1, width, label="file")
+    _ = ax.bar(x + width / 2, y2, width, label="nvme")
+
+    # labels and formatting
+    ax.set_xlabel("Scale Factor")
+    ax.set_ylabel("Time")
+    ax.set_title(title)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    # produce plot
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
-    print("Running Persistence Tests...")
-    tester = Tester()
+    read_results, write_results = run_tests()
 
-    with open(sql_write) as f:
-        sw = f.read()
-
-    with open(sql_read) as f:
-        sr = f.read()
-
-    print("\tStandard DuckDB, using files")
-    for i in range(test_amount):
-        tester.run_file(sw, new_db=True)
-        tester.run_file(sr, new_db=False)
-
-    print("\tModified DuckDB, using nvme")
-    for i in range(test_amount):
-        tester.run_nvme(sw, new_db="-new")
-        tester.run_nvme(sr, new_db="")
-
-    print("\nTest Finished.")
-    tester.get_result()
+    plot_results("Read", read_results)
+    plot_results("Write", write_results)

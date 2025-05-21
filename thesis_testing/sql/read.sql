@@ -1,4 +1,4 @@
 select *
-from people
+from customer
 ;
 
