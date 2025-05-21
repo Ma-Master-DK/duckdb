@@ -206,7 +206,9 @@ def plot_results(title, results):
 
     # produce plot
     plt.tight_layout()
-    plt.show()
+    plt.savefig(cur_dir / f"plots/{title}")
+    if verbose:
+        plt.show()
 
 
 if __name__ == "__main__":
