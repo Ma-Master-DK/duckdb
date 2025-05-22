@@ -210,7 +210,6 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	dev = config.options.dev;
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
-	std::cout << config.options.default_block_alloc_size << "\n";
 	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
 	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
 
@@ -776,7 +775,6 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 
 void SingleFileBlockManager::FileSync() {
 	qpool->Sync();
-	std::cout << "Synced\n";
 }
 
 void SingleFileBlockManager::TrimFreeBlocks() {

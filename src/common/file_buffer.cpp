@@ -156,7 +156,6 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		if (err) {
 			goto exit;
 		}
-		std::cout << "Submitted Command\n";
 	}
 
 	// all is submitted, now wait for completion
@@ -220,7 +219,6 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		if (err) {
 			goto exit;
 		}
-		std::cout << "Submitted Command\n";
 	}
 
 	// all is submitted, DO NOT DRAIN
