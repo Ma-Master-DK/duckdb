@@ -16,25 +16,31 @@ struct cb_args {
 
 class QueueWrapper {
 private:
-	struct xnvme_queue *queue;
-	std::mutex mtx;
 	int id;
-	struct cb_args args;
+	std::mutex mtx;
 	uint32_t qdepth;
+	struct xnvme_queue *queue;
+	struct cb_args args;
 
 public:
 	QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id);
-	void Release();
-	bool TryLock();
-	int SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
-	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	~QueueWrapper() {
+		Close();
+	};
+
 	int GetID();
+	void Poke();
+	void Sync();
 	int Drain();
 	void Close();
-	void Poke();
-	~QueueWrapper();
+
+	int SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
 
 protected:
+	bool TryLock();
+	void Release();
+
 	static void cb_func(struct xnvme_cmd_ctx *ctx, void *cb_arg) {
 		struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
 		cb_args->completed++;
@@ -50,11 +56,14 @@ public:
 	~QueuePool() {
 		Close();
 	};
-	QueueWrapper *GetAvailableQueue();
-	void Close();
+
+	QueueWrapper *SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	QueueWrapper *SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+
 	void Sync();
 
 private:
+	void Close();
 	static int nr_of_queues;
 	std::vector<unique_ptr<QueueWrapper>> queues;
 };

@@ -120,10 +120,6 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 
 	// misc variables for xnvme use
 	QueueWrapper *qwrap;
-	while (!(qwrap = qpool.GetAvailableQueue())) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
-
 	int err = 0;
 	int ret = 0;
 
@@ -133,20 +129,19 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto lba_location = location / lba_size;
 	auto lbas_to_write = (internal_size / lba_size) - 1;
 
-	err = qwrap->SubmitRead(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
+	qwrap = qpool.SubmitRead(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
 	if (err) {
 		goto exit;
 	}
 
 	// all is submitted
-	ret = qwrap->Drain();
+	// ret = qwrap->Drain();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
 	}
 
 exit:
-	qwrap->Release();
 	return;
 }
 
@@ -160,9 +155,6 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 
 	// misc variables for xnvme use
 	QueueWrapper *qwrap;
-	while (!(qwrap = qpool.GetAvailableQueue())) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
 	int err = 0;
 	int ret = 0;
 
@@ -172,19 +164,18 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto lba_location = location / lba_size;
 	auto lbas_to_write = (internal_size / lba_size) - 1;
 
-	err = qwrap->SubmitWrite(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
+	qwrap = qpool.SubmitWrite(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
 	if (err) {
 		goto exit;
 	}
 
-	ret = qwrap->Drain();
+	// ret = qwrap->Drain();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
 	}
 
 exit:
-	qwrap->Release();
 	return;
 }
 

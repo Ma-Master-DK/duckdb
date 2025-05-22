@@ -7,44 +7,43 @@ namespace duckdb {
 
 QueuePool::QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth) {
 	for (int i = 0; i < pool_size; ++i) {
-		// struct xnvme_queue *q;
-		// int ret = xnvme_queue_init(dev, qdepth, 0, &q);
-		// if (ret) {
-		// 	xnvme_cli_perr("xnvme_queue_init()", errno);
-		// 	return;
-		// }
 		queues.push_back(make_uniq<QueueWrapper>(dev, qdepth, i));
 	}
 }
 
-QueueWrapper *QueuePool::GetAvailableQueue() {
+QueueWrapper *QueuePool::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	while (true) {
 		for (auto &qwrap_ptr : queues) {
-			auto &qwrap = *qwrap_ptr;
-			if (qwrap.TryLock()) {
+			if (qwrap_ptr->SubmitRead(dev, lba_location, amount, payload) == 0) {
+				auto &qwrap = *qwrap_ptr;
 				return &qwrap;
 			}
 		}
+	}
+}
 
+QueueWrapper *QueuePool::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+	while (true) {
 		for (auto &qwrap_ptr : queues) {
-			auto &qwrap = *qwrap_ptr;
-			qwrap.Poke();
+			if (qwrap_ptr->SubmitWrite(dev, lba_location, amount, payload) == 0) {
+				auto &qwrap = *qwrap_ptr;
+				return &qwrap;
+			} else {
+				qwrap_ptr->Poke();
+			}
 		}
 	}
-	return nullptr;
 }
 
 void QueuePool::Close() {
 	for (auto &qwrap_ptr : queues) {
-		auto &qwrap = *qwrap_ptr;
-		qwrap.Close();
+		qwrap_ptr->Close();
 	}
 }
 
 void QueuePool::Sync() {
 	for (auto &qwrap_ptr : queues) {
-		auto &qwrap = *qwrap_ptr;
-		qwrap.Drain();
+		qwrap_ptr->Sync();
 	}
 }
 
@@ -64,7 +63,7 @@ void QueueWrapper::Release() {
 }
 
 bool QueueWrapper::TryLock() {
-	if (mtx.try_lock()) {
+	if (queue && mtx.try_lock()) {
 		if (args.inflight < qdepth) {
 			return true;
 		} else {
@@ -79,71 +78,84 @@ int QueueWrapper::GetID() {
 	return id;
 }
 
-int QueueWrapper::Drain() {
-	return xnvme_queue_drain(queue);
-}
-
 void QueueWrapper::Poke() {
 	xnvme_queue_poke(queue, 0);
 }
 
-int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
-	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-	int err;
-
-submit:
-	err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
-	switch (err) {
-	case 0:
-		args.submitted++;
-		args.inflight++;
-		break;
-
-	case -EBUSY:
-	case -EAGAIN:
-		xnvme_queue_poke(queue, 0);
-		goto submit;
-
-	default:
-		xnvme_cli_perr("xnvme_nvm_read()", err);
+void QueueWrapper::Sync() {
+	if (queue) {
+		Drain();
 	}
-	return err;
 }
-int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
-	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-	int err;
 
-submit:
-	err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
-	switch (err) {
-	case 0:
-		args.submitted++;
-		args.inflight++;
-		break;
-
-	case -EBUSY:
-	case -EAGAIN:
-		xnvme_queue_poke(queue, 0);
-		goto submit;
-
-	default:
-		xnvme_cli_perr("xnvme_nvm_read()", err);
+int QueueWrapper::Drain() {
+	if (queue) {
+		while (true) {
+			if (TryLock()) {
+				auto res = xnvme_queue_drain(queue);
+				Release();
+				return res;
+			}
+		}
 	}
-	return err;
+
+	return 0;
 }
 
 void QueueWrapper::Close() {
 	if (queue) {
-		xnvme_queue_term(queue);
-		queue = nullptr;
+		while (true) {
+			if (TryLock()) {
+				xnvme_queue_term(queue);
+				queue = nullptr;
+				Release();
+				return;
+			}
+		}
 	}
 }
 
-QueueWrapper::~QueueWrapper() {
+int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	if (queue) {
-		xnvme_queue_term(queue);
-		queue = nullptr;
+		if (TryLock()) {
+			struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
+
+			int err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
+			if (err == 0) {
+				args.submitted++;
+				args.inflight++;
+			}
+
+			Release();
+			return err;
+		} else {
+			return -1;
+		}
 	}
+
+	return -1;
+}
+
+int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+	if (queue) {
+		if (TryLock()) {
+			struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
+
+			int err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
+			if (err == 0) {
+				args.submitted++;
+				args.inflight++;
+			}
+
+			Release();
+			return err;
+
+		} else {
+			return -1;
+		}
+	}
+
+	return -1;
 }
 
 } // namespace duckdb
