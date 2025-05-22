@@ -127,18 +127,27 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto lbas_to_write = (internal_size / lba_size) - 1;
 
-	qwrap = qpool.SubmitRead(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
-	if (err) {
-		goto exit;
-	}
+	auto mdts_size = geo->mdts_nbytes;
+	auto lbas_pr_mdts = mdts_size / lba_size;
+	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
-	// all is submitted
-	// ret = qwrap->Drain();
-	if (ret < 0) {
-		xnvme_cli_perr("xnvme_queue_drain()", ret);
-		goto exit;
+	for (uint64_t i = 0; i < submissions; i++) {
+		auto offset = i * mdts_size;
+		auto *payload = internal_buffer + offset;
+		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
+
+		qwrap = qpool.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		if (err) {
+			goto exit;
+		}
+
+		// all is submitted
+		// ret = qwrap->Drain();
+		if (ret < 0) {
+			xnvme_cli_perr("xnvme_queue_drain()", ret);
+			goto exit;
+		}
 	}
 
 exit:
@@ -162,17 +171,25 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto lbas_to_write = (internal_size / lba_size) - 1;
+	auto mdts_size = geo->mdts_nbytes;
+	auto lbas_pr_mdts = mdts_size / lba_size;
+	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
-	qwrap = qpool.SubmitWrite(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
-	if (err) {
-		goto exit;
-	}
+	for (uint64_t i = 0; i < submissions; i++) {
+		auto offset = i * mdts_size;
+		auto *payload = internal_buffer + offset;
+		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-	// ret = qwrap->Drain();
-	if (ret < 0) {
-		xnvme_cli_perr("xnvme_queue_drain()", ret);
-		goto exit;
+		qwrap = qpool.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		if (err) {
+			goto exit;
+		}
+
+		// ret = qwrap->Drain();
+		if (ret < 0) {
+			xnvme_cli_perr("xnvme_queue_drain()", ret);
+			goto exit;
+		}
 	}
 
 exit:

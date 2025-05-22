@@ -17,8 +17,8 @@ file_db = cur_dir / "test.db"
 nvme_db = "/dev/nvme1n1"
 
 # test meta information
-test_amount = 5
-test_scales = [0.01, 0.1, 1, 2, 4, 6, 8, 10]
+test_amount = 3
+test_scales = [0.01, 0.1, 1]
 
 # these are the builds of DuckDB we need for testing
 duckdb_file = cur_dir / "builds/duckdb_file"
