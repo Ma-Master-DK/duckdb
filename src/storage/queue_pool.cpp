@@ -87,7 +87,7 @@ void QueueWrapper::Poke() {
 	xnvme_queue_poke(queue, 0);
 }
 
-int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload) {
+int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 	int err;
 
@@ -109,7 +109,7 @@ submit:
 	}
 	return err;
 }
-int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload) {
+int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 	int err;
 

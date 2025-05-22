@@ -26,8 +26,8 @@ public:
 	QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id);
 	void Release();
 	bool TryLock();
-	int SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload);
-	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, char *payload);
+	int SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
 	int GetID();
 	int Drain();
 	void Close();
