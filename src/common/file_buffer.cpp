@@ -5,19 +5,21 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/helper.hpp"
+#include "duckdb/main/config.hpp"
 #include "duckdb/storage/storage_info.hpp"
 #include "duckdb/storage/queue_pool.hpp"
 #include <cstdint>
 #include <cstring>
 
+#include <iostream>
 #include <libxnvme.h>
 #include <libxnvme_nvm.h>
 #include <thread>
 
 namespace duckdb {
 
-FileBuffer::FileBuffer(Allocator &allocator, FileBufferType type, uint64_t user_size)
-    : allocator(allocator), type(type) {
+FileBuffer::FileBuffer(Allocator &allocator, xnvme_dev *dev, FileBufferType type, uint64_t user_size)
+    : allocator(allocator), dev(dev), type(type) {
 	Init();
 	if (user_size) {
 		Resize(user_size);
@@ -37,23 +39,39 @@ FileBuffer::FileBuffer(FileBuffer &source, FileBufferType type_p) : allocator(so
 	size = source.size;
 	internal_buffer = source.internal_buffer;
 	internal_size = source.internal_size;
+	dev = source.dev;
 
 	source.Init();
 }
 
-FileBuffer::~FileBuffer() {
+void FileBuffer::Close() {
 	if (!internal_buffer) {
 		return;
 	}
-	allocator.FreeData(internal_buffer, internal_size);
+	xnvme_buf_free(dev, internal_buffer);
+	internal_buffer = nullptr;
+}
+
+void FileBuffer::CloseWithDev() {
+	if (!internal_buffer) {
+		return;
+	}
+	xnvme_buf_free(dev, internal_buffer);
+	internal_buffer = nullptr;
+	xnvme_dev_close(dev);
+}
+
+FileBuffer::~FileBuffer() {
+	Close();
 }
 
 void FileBuffer::ReallocBuffer(idx_t new_size) {
 	data_ptr_t new_buffer;
 	if (internal_buffer) {
-		new_buffer = allocator.ReallocateData(internal_buffer, internal_size, new_size);
+		new_buffer = static_cast<data_ptr_t>(xnvme_buf_alloc(dev, new_size));
+		xnvme_buf_free(dev, internal_buffer);
 	} else {
-		new_buffer = allocator.AllocateData(new_size);
+		new_buffer = static_cast<data_ptr_t>(xnvme_buf_alloc(dev, new_size));
 	}
 
 	// FIXME: should we throw one of our exceptions here?
@@ -113,7 +131,7 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto mdts_size = geo->mdts_nbytes;
+	auto mdts_size = static_cast<uint32_t>(1 << (64 - __builtin_clzl(geo->mdts_nbytes - 1)));
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
@@ -138,10 +156,11 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		if (err) {
 			goto exit;
 		}
+		std::cout << "Submitted Command\n";
 	}
 
 	// all is submitted, now wait for completion
-	ret = qwrap->Drain();
+	// ret = qwrap->Drain();
 	qwrap->Release();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
@@ -176,7 +195,7 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto mdts_size = geo->mdts_nbytes;
+	auto mdts_size = static_cast<uint32_t>(1 << (64 - __builtin_clzl(geo->mdts_nbytes - 1)));
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
@@ -201,10 +220,12 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		if (err) {
 			goto exit;
 		}
+		std::cout << "Submitted Command\n";
 	}
 
 	// all is submitted, DO NOT DRAIN
-	ret = qwrap->Drain();
+	// ret = qwrap->Drain();
+	// qwrap->Poke();
 	qwrap->Release();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);

@@ -4,12 +4,12 @@
 
 namespace duckdb {
 
-Block::Block(Allocator &allocator, const block_id_t id, const idx_t block_size)
-    : FileBuffer(allocator, FileBufferType::BLOCK, block_size), id(id) {
+Block::Block(Allocator &allocator, xnvme_dev *dev, const block_id_t id, const idx_t block_size)
+    : FileBuffer(allocator, dev, FileBufferType::BLOCK, block_size), id(id) {
 }
 
-Block::Block(Allocator &allocator, block_id_t id, uint32_t internal_size)
-    : FileBuffer(allocator, FileBufferType::BLOCK, internal_size), id(id) {
+Block::Block(Allocator &allocator, xnvme_dev *dev, block_id_t id, uint32_t internal_size)
+    : FileBuffer(allocator, dev, FileBufferType::BLOCK, internal_size), id(id) {
 	D_ASSERT((AllocSize() & (Storage::SECTOR_SIZE - 1)) == 0);
 }
 
