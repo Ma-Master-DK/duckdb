@@ -45,7 +45,7 @@ unique_ptr<FileBuffer> StandardBufferManager::ConstructManagedBuffer(idx_t size,
 		result = make_uniq<FileBuffer>(*tmp, type);
 	} else {
 		// no re-usable buffer: allocate a new buffer
-		result = make_uniq<FileBuffer>(Allocator::Get(db), type, size);
+		result = make_uniq<FileBuffer>(Allocator::Get(db), DBConfig::GetConfig(db).options.dev, type, size);
 	}
 	result->Initialize(DBConfig::GetConfig(db).options.debug_initialize);
 	return result;

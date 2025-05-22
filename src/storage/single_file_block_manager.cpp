@@ -156,14 +156,15 @@ DatabaseHeader DeserializeDatabaseHeader(const MainHeader &main_header, data_ptr
 SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const string &path_p,
                                                const StorageManagerOptions &options)
     : BlockManager(BufferManager::GetBufferManager(db), options.block_alloc_size), db(db), path(path_p),
-      header_buffer(Allocator::Get(db), FileBufferType::MANAGED_BUFFER,
+      header_buffer(Allocator::Get(db), DBConfig::Get(db).options.dev, FileBufferType::MANAGED_BUFFER,
                     Storage::FILE_HEADER_SIZE - Storage::DEFAULT_BLOCK_HEADER_SIZE),
       iteration_count(0), options(options) {
+	dev = DBConfig::Get(db).options.dev;
 }
 
 SingleFileBlockManager::~SingleFileBlockManager() {
 	qpool->Close();
-	xnvme_dev_close(dev);
+	header_buffer.Close();
 }
 
 FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {
@@ -205,16 +206,8 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 }
 
 void SingleFileBlockManager::CreateNewDatabase() {
-	xnvme_opts opts = xnvme_opts_default();
-	opts.be = "linux";
-	opts.async = "io_uring";
-	dev = xnvme_dev_open(path.c_str(), &opts);
-	if (!dev) {
-		xnvme_cli_perr("xnvme_dev_open()", errno);
-		return;
-	}
-
 	auto &config = DBConfig::Get(db);
+	dev = config.options.dev;
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
@@ -232,6 +225,7 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	SerializeHeaderStructure<MainHeader>(main_header, header_buffer.buffer);
 	// now write the header to the file
 	ChecksumAndWrite(header_buffer, 0);
+	FileSync();
 	header_buffer.Clear();
 
 	// write the database headers
@@ -273,16 +267,8 @@ void SingleFileBlockManager::CreateNewDatabase() {
 }
 
 void SingleFileBlockManager::LoadExistingDatabase() {
-	xnvme_opts opts = xnvme_opts_default();
-	opts.be = "linux";
-	opts.async = "io_uring";
-	dev = xnvme_dev_open(path.c_str(), &opts);
-	if (!dev) {
-		xnvme_cli_perr("xnvme_dev_open()", errno);
-		return;
-	}
-
 	auto &config = DBConfig::Get(db);
+	dev = config.options.dev;
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
 	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
 	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
@@ -320,6 +306,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
 	// read the buffer from disk
 	block.Read(dev, location, *qpool);
+	qpool->Sync();
 
 	// compute the checksum
 	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
@@ -589,7 +576,7 @@ unique_ptr<Block> SingleFileBlockManager::CreateBlock(block_id_t block_id, FileB
 	if (source_buffer) {
 		result = ConvertBlock(block_id, *source_buffer);
 	} else {
-		result = make_uniq<Block>(Allocator::Get(db), block_id, GetBlockSize());
+		result = make_uniq<Block>(Allocator::Get(db), dev, block_id, GetBlockSize());
 	}
 	result->Initialize(options.debug_initialize);
 	return result;

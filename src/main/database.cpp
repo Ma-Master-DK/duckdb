@@ -89,6 +89,7 @@ DatabaseInstance::~DatabaseInstance() {
 	Allocator::SetBackgroundThreads(false);
 	// after all destruction is complete clear the cache entry
 	config.db_cache_entry.reset();
+	xnvme_dev_close(config.options.dev);
 }
 
 BufferManager &BufferManager::GetBufferManager(DatabaseInstance &db) {
@@ -409,6 +410,19 @@ void DatabaseInstance::Configure(DBConfig &new_config, const char *database_path
 		config.options.database_path = database_path;
 	} else {
 		config.options.database_path.clear();
+	}
+
+	if (database_path[0] == '/') {
+		// Open the device
+
+		xnvme_opts opts = xnvme_opts_default();
+		opts.be = "linux";
+		opts.async = "io_uring";
+		config.options.dev = xnvme_dev_open(database_path, &opts);
+		if (!config.options.dev) {
+			xnvme_cli_perr("xnvme_dev_open()", errno);
+			return;
+		}
 	}
 
 	if (new_config.options.temporary_directory.empty()) {

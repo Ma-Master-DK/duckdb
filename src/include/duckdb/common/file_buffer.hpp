@@ -31,12 +31,13 @@ public:
 	//! (typically 8 bytes). On return, this->AllocSize() >= this->size >= user_size.
 	//! Our allocation size will always be page-aligned, which is necessary to support
 	//! DIRECT_IO
-	FileBuffer(Allocator &allocator, FileBufferType type, uint64_t user_size);
+	FileBuffer(Allocator &allocator, xnvme_dev *dev, FileBufferType type, uint64_t user_size);
 	FileBuffer(FileBuffer &source, FileBufferType type);
 
 	virtual ~FileBuffer();
 
 	Allocator &allocator;
+	xnvme_dev *dev;
 	//! The buffer that users can write to
 	data_ptr_t buffer;
 	//! The user-facing size of the buffer.
@@ -50,6 +51,8 @@ public:
 	//! Write the contents of the FileBuffer to the specified location.
 	void Write(FileHandle &handle, uint64_t location);
 	void Write(xnvme_dev *handle, uint64_t location, QueuePool &qpool);
+	void Close();
+	void CloseWithDev();
 
 	void Clear();
 

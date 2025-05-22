@@ -19,8 +19,8 @@ class Deserializer;
 
 class Block : public FileBuffer {
 public:
-	Block(Allocator &allocator, const block_id_t id, const idx_t block_size);
-	Block(Allocator &allocator, block_id_t id, uint32_t internal_size);
+	Block(Allocator &allocator, xnvme_dev *dev, const block_id_t id, const idx_t block_size);
+	Block(Allocator &allocator, xnvme_dev *dev, block_id_t id, uint32_t internal_size);
 	Block(FileBuffer &source, block_id_t id);
 
 	block_id_t id;
