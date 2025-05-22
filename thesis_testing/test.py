@@ -1,4 +1,5 @@
 import os
+import re
 import statistics
 import subprocess
 import time
@@ -16,7 +17,7 @@ file_db = cur_dir / "test.db"
 nvme_db = "/dev/nvme1n1"
 
 # test meta information
-test_amount = 3
+test_amount = 1
 test_scales = [0.01, 0.1, 1]
 
 # these are the builds of DuckDB we need for testing
@@ -26,7 +27,7 @@ if not (duckdb_file.exists() and duckdb_nvme.exists()):
     print("Could not find the required build files.")
     exit()
 
-# sql files, THIS MIGHT NEED REWORKING
+# sql file
 sql_read = cur_dir / "sql/read.sql"
 if not (sql_read.exists()):
     print("Could not find sql file.")
@@ -58,6 +59,9 @@ class Tester:
         Get the result from the internal timers.
         """
 
+        print("read:  ", self._read_times)
+        print("write: ", self._write_times)
+
         read = statistics.mean(self._read_times)
         write = statistics.mean(self._write_times)
 
@@ -79,15 +83,14 @@ class Tester:
             stderr=subprocess.PIPE,
         )
 
-        start_time = time.perf_counter()
-
-        # execute SQL against db
-        # adds an 'exit' statement for DuckDB to exit session after SQL
-        sql_cmd = ".mode trash\n" + f"CALL dbgen(sf={self._scale_factor});" + "\n.exit"
+        sql_cmd = f"explain analyse call dbgen(sf={self._scale_factor});\n.exit\n"
         stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
 
-        sql_time = time.perf_counter()
-        self._write_times.insert(0, sql_time - start_time)
+        match = re.search(r"Total Time:\s*([\d.]+)s", stdout.decode("utf-8"))
+        if match:
+            self._write_times.insert(0, float(match.group(1)))
+        else:
+            print("no write time.")
 
         if stderr:
             print("\t\tFAILED")
@@ -112,15 +115,14 @@ class Tester:
             stderr=subprocess.PIPE,
         )
 
-        start_time = time.perf_counter()
-
-        # execute SQL against db
-        # adds an 'exit' statement for DuckDB to exit session after SQL
-        sql_cmd = ".mode trash\n" + sql + "\n.exit"
+        sql_cmd = f"{sql}\n.exit\n"
         stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
 
-        sql_time = time.perf_counter()
-        self._read_times.insert(0, sql_time - start_time)
+        match = re.search(r"Total Time:\s*([\d.]+)s", stdout.decode("utf-8"))
+        if match:
+            self._read_times.insert(0, float(match.group(1)))
+        else:
+            print("no read time.")
 
         if stderr:
             print("\t\tFAILED")

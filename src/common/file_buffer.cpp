@@ -131,46 +131,22 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto mdts_size = static_cast<uint32_t>(1 << (64 - __builtin_clzl(geo->mdts_nbytes - 1)));
-	auto lbas_pr_mdts = mdts_size / lba_size;
-	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
+	auto lbas_to_write = (internal_size / lba_size) - 1;
 
-	// allocate dma buffer
-	// auto nvme_buf_size = lba_size * lba_amount;
-	// char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
-	// if (!nvme_buf) {
-	// 	xnvme_cli_perr("xnvme_buf_alloc()", errno);
-	// 	goto exit;
-	// }
-
-	// clear buffer before writing to it, maybe not necessary
-	// xnvme_buf_clear(nvme_buf, nvme_buf_size);
-
-	// read one lba block at a time, sequentially, into dma buffer
-	for (uint64_t i = 0; i < submissions; i++) {
-		auto offset = i * mdts_size;
-		auto *payload = internal_buffer + offset;
-		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
-
-		err = qwrap->SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
-		if (err) {
-			goto exit;
-		}
+	err = qwrap->SubmitRead(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
+	if (err) {
+		goto exit;
 	}
 
-	// all is submitted, now wait for completion
-	// ret = qwrap->Drain();
-	qwrap->Release();
+	// all is submitted
+	ret = qwrap->Drain();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
 	}
 
-	// transfer data in dma buffer to duckdb buffer
-	// memcpy(internal_buffer, nvme_buf, nvme_buf_size);
-
 exit:
-	// xnvme_buf_free(dev, nvme_buf);
+	qwrap->Release();
 	return;
 }
 
@@ -194,47 +170,21 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto mdts_size = static_cast<uint32_t>(1 << (64 - __builtin_clzl(geo->mdts_nbytes - 1)));
-	auto lbas_pr_mdts = mdts_size / lba_size;
-	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
+	auto lbas_to_write = (internal_size / lba_size) - 1;
 
-	// allocate dma buffer
-	// auto nvme_buf_size = lba_size * lba_amount;
-	// char *nvme_buf = static_cast<char *>(xnvme_buf_alloc(dev, nvme_buf_size));
-	// if (!nvme_buf) {
-	// 	xnvme_cli_perr("xnvme_buf_alloc()", errno);
-	// 	goto exit;
-	// }
-
-	// transfer data from duckdb buffer to dma buffer
-	// memcpy(nvme_buf, internal_buffer, nvme_buf_size);
-
-	// write one lba block at a time, sequentially, to disk from dma buffer
-	for (uint64_t i = 0; i < submissions; i++) {
-		auto offset = i * mdts_size;
-		auto *payload = internal_buffer + offset;
-		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
-
-		err = qwrap->SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
-		if (err) {
-			goto exit;
-		}
+	err = qwrap->SubmitWrite(dev, lba_location, (uint16_t)lbas_to_write, internal_buffer);
+	if (err) {
+		goto exit;
 	}
 
-	// all is submitted, DO NOT DRAIN
-	// ret = qwrap->Drain();
-	// qwrap->Poke();
-	qwrap->Release();
+	ret = qwrap->Drain();
 	if (ret < 0) {
 		xnvme_cli_perr("xnvme_queue_drain()", ret);
 		goto exit;
 	}
 
-	// transfer data in dma buffer to duckdb buffer
-	// memcpy(internal_buffer, nvme_buf, nvme_buf_size);
-
 exit:
-	// xnvme_buf_free(dev, nvme_buf);
+	qwrap->Release();
 	return;
 }
 

@@ -47,7 +47,9 @@ protected:
 class QueuePool {
 public:
 	QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth);
-	~QueuePool() {};
+	~QueuePool() {
+		Close();
+	};
 	QueueWrapper *GetAvailableQueue();
 	void Close();
 	void Sync();

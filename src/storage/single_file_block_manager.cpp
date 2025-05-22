@@ -163,7 +163,6 @@ SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const strin
 }
 
 SingleFileBlockManager::~SingleFileBlockManager() {
-	qpool->Close();
 	header_buffer.Close();
 }
 
