@@ -139,7 +139,9 @@ submit:
 
 void QueueWrapper::Close() {
 	if (queue) {
+		mtx.lock();
 		xnvme_queue_term(queue);
+		mtx.unlock();
 		queue = nullptr;
 	}
 }
