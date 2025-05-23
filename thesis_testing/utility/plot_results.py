@@ -10,7 +10,7 @@ import numpy as np
 test_dir = Path("..")
 verbose = False
 
-r_file = test_dir / "utility/test_results.txt"
+r_file = test_dir / "results/test_results.txt"
 
 
 def parse_results(data_file):
