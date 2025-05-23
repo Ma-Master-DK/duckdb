@@ -80,11 +80,16 @@ int QueueWrapper::GetID() {
 }
 
 int QueueWrapper::Drain() {
-	return xnvme_queue_drain(queue);
+	mtx.lock();
+	int err = xnvme_queue_drain(queue);
+	mtx.unlock();
+	return err;
 }
 
 void QueueWrapper::Poke() {
+	mtx.lock();
 	xnvme_queue_poke(queue, 0);
+	mtx.unlock();
 }
 
 int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
