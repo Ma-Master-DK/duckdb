@@ -34,6 +34,14 @@ if not (sql_read.exists()):
     exit()
 
 
+def clear_linux_cache():
+    # Flush file system buffers
+    subprocess.run(["sync"])
+
+    # Clear page cache (requires sudo)
+    subprocess.run(["sudo", "bash", "-c", "echo 3 > /proc/sys/vm/drop_caches"])
+
+
 class Tester:
     def __init__(self, build, db, scale_factor):
         """
@@ -158,6 +166,7 @@ def run_tests():
                 os.remove(file_db)
 
             file_tester.test_write(sql)
+            clear_linux_cache()
             file_tester.test_read(sql)
 
         read, write = file_tester.get_result()
@@ -169,6 +178,7 @@ def run_tests():
         nvme_tester = Tester(duckdb_nvme, nvme_db, scale_factor)
         for i in range(test_amount):
             nvme_tester.test_write(sql, "-new")
+            clear_linux_cache()
             nvme_tester.test_read(sql)
 
         read, write = nvme_tester.get_result()

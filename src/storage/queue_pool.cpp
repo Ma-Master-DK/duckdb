@@ -90,13 +90,10 @@ void QueueWrapper::Sync() {
 
 int QueueWrapper::Drain() {
 	if (queue) {
-		while (true) {
-			if (TryLock()) {
-				auto res = xnvme_queue_drain(queue);
-				Release();
-				return res;
-			}
-		}
+		mtx.lock();
+		auto res = xnvme_queue_drain(queue);
+		mtx.unlock();
+		return res;
 	}
 
 	return 0;
@@ -104,14 +101,11 @@ int QueueWrapper::Drain() {
 
 void QueueWrapper::Close() {
 	if (queue) {
-		while (true) {
-			if (TryLock()) {
-				xnvme_queue_term(queue);
-				queue = nullptr;
-				Release();
-				return;
-			}
-		}
+		mtx.lock();
+		xnvme_queue_term(queue);
+		queue = nullptr;
+		mtx.unlock();
+		return;
 	}
 }
 
