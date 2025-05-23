@@ -9,6 +9,7 @@ import numpy as np
 # general use
 test_dir = Path("..")
 verbose = False
+dir = "vertical"  # horizontal/vertical
 
 r_file = test_dir / "results/test_results.txt"
 
@@ -72,8 +73,66 @@ def plot_results(title, results):
         plt.show()
 
 
+def latex_results_horizontal(title, data):
+    cols = 1
+    row_header = r"\textbf{Scale Factor}"
+    row_file = "File"
+    row_nvme = "Nvme"
+    row_gain = "Gain"
+
+    for sf, (file, nvme) in data.items():
+        cols += 1
+        row_header += f" & {sf}"
+        row_file += f" & {file}"
+        row_nvme += f" & {nvme}"
+        row_gain += f" & {round(file/nvme, 2)}"
+
+    cols = "c" + ("|c" * (cols - 1))
+
+    return f"""
+\\begin{{table}}[H]
+    \\centering
+    \\begin{{tabular}}{{{cols}}}
+        {row_header} \\\\\\hline
+        {row_file} \\\\
+        {row_nvme} \\\\\\hline
+        {row_gain} \\\\
+    \\end{{tabular}}
+    \\caption{{{title}}}
+    \\label{{}}
+\\end{{table}}
+"""
+
+
+def latex_results_vertical(title, data):
+    cols = "c|cc|c"
+
+    rows = """\t\t\\textbf{{Scale Factor}} & File & Nvme & Gain \\\\\\hline"""
+
+    for sf, (file, nvme) in data.items():
+        rows += f"""\n\t\t{sf} & {file} & {nvme} & {round(file/nvme, 2)} \\\\"""
+
+    return f"""
+\\begin{{table}}[H]
+    \\centering
+    \\begin{{tabular}}{{{cols}}}
+{rows}
+    \\end{{tabular}}
+    \\caption{{{title}}}
+    \\label{{}}
+\\end{{table}}
+"""
+
+
 if __name__ == "__main__":
     read_results, write_results = parse_results(r_file)
 
     plot_results("Read", read_results)
     plot_results("Write", write_results)
+
+    if dir == "horizontal":
+        print(latex_results_horizontal("Read", read_results))
+        print(latex_results_horizontal("Write", write_results))
+    else:
+        print(latex_results_vertical("Read", read_results))
+        print(latex_results_vertical("Write", write_results))
