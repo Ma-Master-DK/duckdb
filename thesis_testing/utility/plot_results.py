@@ -68,7 +68,7 @@ def plot_results(title, results):
 
     # produce plot
     plt.tight_layout()
-    plt.savefig(test_dir / f"plots/{title}")
+    plt.savefig(test_dir / f"results/{title}")
     if verbose:
         plt.show()
 
