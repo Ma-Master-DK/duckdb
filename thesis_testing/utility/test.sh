@@ -3,10 +3,10 @@
 # Configuration
 DB="benchmark.duckdb"
 DEV="/dev/nvme1n1"
-CUSTOM="builds/duckdb_nvme"
-STANDARD="builds/duckdb_file"
-sfs=(0.01 0.1 1 2 4 6 8 10)
-RUNS=3
+CUSTOM="../builds/duckdb_nvme"
+STANDARD="../builds/duckdb_file"
+sfs=(0.01 0.1 1)
+RUNS=5
 
 if ! sudo -v; then
         echo "Error: sudo required to clear OS caches."
@@ -82,13 +82,13 @@ remove_existing_db
 for sf in "${sfs[@]}"; do
         echo "sf: $sf"
         echo "===> WRITE-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
-        run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
         run_write_benchmark "$STANDARD" "Standard DuckDB (Write)" "$sf" "$DB"
+        run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
 
 
         echo "===> READ-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
-        run_read_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$DEV"
         run_read_benchmark "$STANDARD" "Standard DuckDB (Read)" "$DB"
+        run_read_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$DEV"
 
         echo ""
 done

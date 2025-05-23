@@ -1,2 +1,4 @@
 builds/*
-test.db
+*.db
+*.duckdb
+
