@@ -5,24 +5,20 @@ DB="benchmark.duckdb"
 DEV="/dev/nvme1n1"
 CUSTOM="builds/duckdb_nvme"
 STANDARD="builds/duckdb_file"
-SQL_CREATE="./create_table.sql"
-SQL_WRITE="./io_write.sql"
-SQL_READ="./io_read.sql"
-RUNS=2
+sfs=(0.01 0.1 1 2 3)
+RUNS=1
 
 if ! sudo -v; then
         echo "Error: sudo required to clear OS caches."
         exit 1
 fi
 
-if [ -f "$DB" ]; then
-        echo "Removing previous database..."
-        rm "$DB"
-fi
-
-echo "Creating benchmark databases..."
-$CUSTOM $DEV "-new" -f $SQL_CREATE 2>/dev/null
-$STANDARD $DB -f $SQL_CREATE 2>/dev/null
+function remove_existing_db() {
+        if [ -f "$DB" ]; then
+                echo "Removing previous database..."
+                rm "$DB"
+        fi
+}
 
 function clear_caches() {
         echo "Clearing system cache..."
@@ -30,19 +26,43 @@ function clear_caches() {
         echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
 }
 
-function run_benchmark() {
+function run_write_benchmark() {
         local bin=$1
         local label=$2
-        local query=$3
+        local sf=$3
         local file=$4
         local total_s=0
+        local query="EXPLAIN ANALYZE CALL dbgen(sf=$sf);"
 
         echo "-----------------------------------"
         echo "Benchmark $label"
         for i in $(seq 1 $RUNS); do
                 clear_caches
                 echo "Running query..."
-                result=$($bin $file -f $query)
+                result=$(echo "$query" | $bin $file)
+                time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
+                echo "  Run $i: $time_s s"
+                total_s=$(echo "$total_s + $time_s" | bc)
+        done
+
+        avg=$(echo "scale=3; $total_s / $RUNS" | bc)
+        echo "Average time for $label: $avg s"
+        echo
+}
+
+function run_read_benchmark() {
+        local bin=$1
+        local label=$2
+        local file=$3
+        local total_s=0
+        local query="EXPLAIN ANALYZE SELECT * FROM customer;"
+
+        echo "-----------------------------------"
+        echo "Benchmark $label"
+        for i in $(seq 1 $RUNS); do
+                clear_caches
+                echo "Running query..."
+                result=$(echo "$query" | $bin $file)
                 time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
                 echo "  Run $i: $time_s s"
                 total_s=$(echo "$total_s + $time_s" | bc)
@@ -57,13 +77,18 @@ function run_benchmark() {
 # RUN BENCHMARKS
 # ------------------------------------------
 
+remove_existing_db
 
-echo "===> WRITE-INTENSIVE QUERY BENCHMARK"
-run_benchmark "$CUSTOM" "xnvme DuckDB (Write)" "$SQL_WRITE" "$DEV"
-run_benchmark "$STANDARD" "Standard DuckDB (Write)" "$SQL_WRITE" "$DB"
+for sf in "${sfs[@]}"; do
+        echo "sf: $sf"
+        echo "===> WRITE-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
+        run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
+        run_write_benchmark "$STANDARD" "Standard DuckDB (Write)" "$sf" "$DB"
 
 
-echo "===> READ-INTENSIVE QUERY BENCHMARK"
-run_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$SQL_READ" "$DEV"
-run_benchmark "$STANDARD" "Standard DuckDB (Read)" "$SQL_READ" "$DB"
+        echo "===> READ-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
+        run_read_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$DEV"
+        run_read_benchmark "$STANDARD" "Standard DuckDB (Read)" "$DB"
 
+        echo ""
+done
