@@ -6,7 +6,7 @@ if ! sudo -v; then
 fi
 
 echo "Running Tests.."
-./test.sh > ../results/test_results.txt
+./test.sh
 
 echo "Generating Plots.."
 python3 plot_results.py

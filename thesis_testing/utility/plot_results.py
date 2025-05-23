@@ -30,9 +30,8 @@ def parse_results(data_file):
             cur_sf = float(match.group(1))
             cur_rs = []
 
-        elif match := re.search(r"Average time.*: (\d*\.\d+).*", line):
-            # extract time
-            cur_rs.append(float(match.group(1)))
+        elif match := re.search(r"\d*\.\d+", line):
+            cur_rs.append(float(line))
 
         else:
             continue
