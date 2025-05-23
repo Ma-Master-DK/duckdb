@@ -39,7 +39,6 @@ public:
 
 protected:
 	bool TryLock();
-	void Release();
 
 	static void cb_func(struct xnvme_cmd_ctx *ctx, void *cb_arg) {
 		struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
@@ -57,8 +56,8 @@ public:
 		Close();
 	};
 
-	QueueWrapper *SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
-	QueueWrapper *SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	void SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	void SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
 
 	void Sync();
 

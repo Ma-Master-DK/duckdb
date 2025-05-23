@@ -11,23 +11,21 @@ QueuePool::QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth) {
 	}
 }
 
-QueueWrapper *QueuePool::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+void QueuePool::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	while (true) {
 		for (auto &qwrap_ptr : queues) {
 			if (qwrap_ptr->SubmitRead(dev, lba_location, amount, payload) == 0) {
-				auto &qwrap = *qwrap_ptr;
-				return &qwrap;
+				return;
 			}
 		}
 	}
 }
 
-QueueWrapper *QueuePool::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+void QueuePool::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	while (true) {
 		for (auto &qwrap_ptr : queues) {
 			if (qwrap_ptr->SubmitWrite(dev, lba_location, amount, payload) == 0) {
-				auto &qwrap = *qwrap_ptr;
-				return &qwrap;
+				return;
 			} else {
 				qwrap_ptr->Poke();
 			}
@@ -58,10 +56,6 @@ QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
 	xnvme_queue_set_cb(queue, QueueWrapper::cb_func, &args);
 }
 
-void QueueWrapper::Release() {
-	mtx.unlock();
-}
-
 bool QueueWrapper::TryLock() {
 	if (queue && mtx.try_lock()) {
 		if (args.inflight < qdepth) {
@@ -79,7 +73,11 @@ int QueueWrapper::GetID() {
 }
 
 void QueueWrapper::Poke() {
-	xnvme_queue_poke(queue, 0);
+	if (queue) {
+		mtx.lock();
+		xnvme_queue_poke(queue, 0);
+		mtx.unlock();
+	}
 }
 
 void QueueWrapper::Sync() {
@@ -120,7 +118,7 @@ int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amo
 				args.inflight++;
 			}
 
-			Release();
+			mtx.unlock();
 			return err;
 		} else {
 			return -1;
@@ -141,7 +139,7 @@ int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t am
 				args.inflight++;
 			}
 
-			Release();
+			mtx.unlock();
 			return err;
 
 		} else {
