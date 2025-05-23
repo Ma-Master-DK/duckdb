@@ -1,0 +1,36 @@
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{c|cc|c}
+		\textbf{{Scale Factor}} & File & Nvme & Gain \\\hline
+		0.01 & 0.002 & 0.002 & 1.0 \\
+		0.1 & 0.014 & 0.004 & 3.5 \\
+		1.0 & 0.032 & 0.023 & 1.39 \\
+		2.0 & 0.06 & 0.037 & 1.62 \\
+		4.0 & 0.116 & 0.044 & 2.64 \\
+		6.0 & 0.209 & 0.071 & 2.94 \\
+		8.0 & 0.323 & 0.096 & 3.36 \\
+		10.0 & 0.469 & 0.137 & 3.42 \\
+    \end{tabular}
+    \caption{Read}
+    \label{}
+\end{table}
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{c|cc|c}
+		\textbf{{Scale Factor}} & File & Nvme & Gain \\\hline
+		0.01 & 0.151 & 0.151 & 1.0 \\
+		0.1 & 1.282 & 1.366 & 0.94 \\
+		1.0 & 8.068 & 7.974 & 1.01 \\
+		2.0 & 15.188 & 15.344 & 0.99 \\
+		4.0 & 30.638 & 30.566 & 1.0 \\
+		6.0 & 46.048 & 45.62 & 1.01 \\
+		8.0 & 61.076 & 61.066 & 1.0 \\
+		10.0 & 76.592 & 76.288 & 1.0 \\
+    \end{tabular}
+    \caption{Write}
+    \label{}
+\end{table}
+

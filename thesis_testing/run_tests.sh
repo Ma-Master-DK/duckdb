@@ -9,7 +9,7 @@ echo "Running Tests.."
 ./test.sh
 
 echo "Generating Plots.."
-python3 plot_results.py
+python3 plot_results.py > ../results/latex_tables.txt
 
 cd ..
 echo "Done."
