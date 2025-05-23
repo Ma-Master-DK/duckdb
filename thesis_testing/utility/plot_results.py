@@ -107,10 +107,11 @@ def latex_results_horizontal(title, data):
 def latex_results_vertical(title, data):
     cols = "c|cc|c"
 
-    rows = """\t\t\\textbf{{Scale Factor}} & File & Nvme & Gain \\\\\\hline"""
+    rows = """        \\textbf{{Scale Factor}} & File & Nvme & Gain \\\\\\hline"""
 
     for sf, (file, nvme) in data.items():
-        rows += f"""\n\t\t{sf} & {file} & {nvme} & {round(file/nvme, 2)} \\\\"""
+        rows += f"""
+        {sf} & {file} & {nvme} & {round(file/nvme, 2)} \\\\"""
 
     return f"""
 \\begin{{table}}[H]
