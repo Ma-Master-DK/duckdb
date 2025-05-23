@@ -125,6 +125,7 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	}
 
 	int err = 0;
+	int ret = 0;
 
 	// extract meta data from device
 	auto geo = xnvme_dev_get_geo(dev);
@@ -134,7 +135,6 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
-	// read one lba block at a time, sequentially, into dma buffer
 	for (uint64_t i = 0; i < submissions; i++) {
 		auto offset = i * mdts_size;
 		auto *payload = internal_buffer + offset;
@@ -147,7 +147,6 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	}
 
 	qwrap->Release();
-
 exit:
 	return;
 }
@@ -171,7 +170,7 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto geo = xnvme_dev_get_geo(dev);
 	auto lba_size = geo->nbytes;
 	auto lba_location = location / lba_size;
-	auto mdts_size = geo->mdts_nbytes;
+	auto mdts_size = static_cast<uint32_t>(1 << (64 - __builtin_clzl(geo->mdts_nbytes - 1)));
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
