@@ -5,8 +5,8 @@ DB="benchmark.duckdb"
 DEV="/dev/nvme1n1"
 CUSTOM="../builds/duckdb_nvme"
 STANDARD="../builds/duckdb_file"
-sfs=(0.01 0.1 1)
-RUNS=2
+sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100)
+RUNS=10
 RESULTS="../results/test_results.txt"
 
 if ! sudo -v; then
