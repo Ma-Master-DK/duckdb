@@ -54,13 +54,13 @@ def plot_results(title, results):
     width = 0.35
 
     # plot
-    fix, ax = plt.subplots()
+    fix, ax = plt.subplots(figsize=(12, 6))
     _ = ax.bar(x - width / 2, y1, width, label="file")
     _ = ax.bar(x + width / 2, y2, width, label="nvme")
 
     # labels and formatting
     ax.set_xlabel("Scale Factor")
-    ax.set_ylabel("Time")
+    ax.set_ylabel("Seconds")
     ax.set_title(title)
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
@@ -83,8 +83,8 @@ def latex_results_horizontal(title, data):
     for sf, (file, nvme) in data.items():
         cols += 1
         row_header += f" & {sf}"
-        row_file += f" & {file}"
-        row_nvme += f" & {nvme}"
+        row_file += f" & {round(file, 2)}"
+        row_nvme += f" & {round(nvme, 2)}"
         row_gain += f" & {round(file/nvme, 2)}"
 
     cols = "c" + ("|c" * (cols - 1))
@@ -111,7 +111,7 @@ def latex_results_vertical(title, data):
 
     for sf, (file, nvme) in data.items():
         rows += f"""
-        {sf} & {file} & {nvme} & {round(file/nvme, 2)} \\\\"""
+        {sf} & {round(file, 2)} & {round(nvme, 2)} & {round(file/nvme, 2)} \\\\"""
 
     return f"""
 \\begin{{table}}[H]

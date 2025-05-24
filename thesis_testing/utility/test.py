@@ -1,0 +1,204 @@
+import os
+import re
+import statistics
+import subprocess
+import time
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+from present_results import (
+    latex_results_horizontal,
+    latex_results_vertical,
+    plot_results,
+)
+
+# general use
+test_dir = Path("..")
+verbose = False
+table_dir = "horizontal"  # horizontal/vertical
+
+# db configuration
+file_db = test_dir / "test.db"
+nvme_db = "/dev/nvme1n1"
+
+# test meta information
+test_amount = 3
+test_scales = [0.1, 0.5, 1, 1.5, 2]
+
+# these are the builds of DuckDB we need for testing
+duckdb_file = test_dir / "builds/duckdb_file"
+duckdb_nvme = test_dir / "builds/duckdb_nvme"
+if not (duckdb_file.exists() and duckdb_nvme.exists()):
+    print("Could not find the required build files.")
+    exit()
+
+
+def clear_cache():
+    try:
+        with open("/proc/sys/vm/drop_caches", "w") as f:
+            f.write("3\n")
+    except Exception as e:
+        print("failed to clear cache")
+
+    # res = subprocess.run(["sudo", "sh", "-c", "echo 3 > /proc/sys/vm/drop_caches"])
+    # if res != 0:
+    #     print("failed to clear cache.")
+    #     print(res.stderr)
+
+
+class Tester:
+    def __init__(self, build, db, scale_factor):
+        """
+        Initialize 'Tester' Class.
+
+        We use file_times and nvme_times to store timers for each
+        build, respectively
+        """
+
+        # configuration of DuckDB
+        self._build = build
+        self._db = db
+
+        # scale factor for generating test data
+        self._scale_factor = scale_factor
+
+        # time logs for read/write
+        self._read_times = []
+        self._write_times = []
+
+    def get_result(self):
+        """
+        Get the result from the internal timers.
+        """
+
+        read = statistics.mean(self._read_times)
+        write = statistics.mean(self._write_times)
+
+        print(f"\t\t\tRead:  {read: .9f}\n\t\t\tWrite: {write: .9f}")
+
+        return read, write
+
+    def test_write(self, new_db=""):
+        """
+        Runs the given SQL against the specified build of DuckDB
+        """
+
+        # start a DuckDB session against the db
+        # runs in a child process
+        proc = subprocess.Popen(
+            [self._build, new_db, self._db],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        clear_cache()
+
+        sql_cmd = f"explain analyse call dbgen(sf={self._scale_factor});\n.exit\n"
+        stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
+
+        match = re.search(r"Total Time:\s*([\d.]+)s", stdout.decode("utf-8"))
+        if match:
+            self._write_times.insert(0, float(match.group(1)))
+        else:
+            print("no write time.")
+
+        if stderr:
+            print("\t\tFAILED")
+
+        if verbose:
+            print(
+                stdout.decode("utf-8").strip(),
+                stderr.decode("utf-8").strip(),
+            )
+
+    def test_read(self):
+        """
+        Runs the given SQL against the specified build of DuckDB
+        """
+
+        # start a DuckDB session against the db
+        # runs in a child process
+        proc = subprocess.Popen(
+            [self._build, self._db],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        clear_cache()
+
+        sql_cmd = f"explain analyse select * from lineitem;\n.exit\n"
+        stdout, stderr = proc.communicate(sql_cmd.encode("utf-8"))
+
+        match = re.search(r"Total Time:\s*([\d.]+)s", stdout.decode("utf-8"))
+        if match:
+            self._read_times.insert(0, float(match.group(1)))
+        else:
+            print("no read time.")
+
+        if stderr:
+            print("\t\tFAILED")
+
+        if verbose:
+            print(
+                stdout.decode("utf-8").strip(),
+                stderr.decode("utf-8").strip(),
+            )
+
+
+def run_tests():
+    read_results = {}
+    write_results = {}
+
+    print("Running Tests..")
+
+    for scale_factor in test_scales:
+        read_results[scale_factor] = []
+        write_results[scale_factor] = []
+
+        print(f"\n\tTesting for scale factor: {scale_factor}")
+
+        # test for standard DuckDB
+        print("\t\tStandard DuckDB, file")
+        file_tester = Tester(duckdb_file, file_db, scale_factor)
+        for i in range(test_amount):
+            if file_db.exists():
+                os.remove(file_db)
+
+            file_tester.test_write()
+            file_tester.test_read()
+
+        read, write = file_tester.get_result()
+        read_results[scale_factor].append(read)
+        write_results[scale_factor].append(write)
+
+        # test for modified DuckDB, nvme
+        print("\t\tModified DuckDB, nvme")
+        nvme_tester = Tester(duckdb_nvme, nvme_db, scale_factor)
+        for i in range(test_amount):
+            nvme_tester.test_write("-new")
+            nvme_tester.test_read()
+
+        read, write = nvme_tester.get_result()
+        read_results[scale_factor].append(read)
+        write_results[scale_factor].append(write)
+
+    return read_results, write_results
+
+
+if __name__ == "__main__":
+    os.system("clear")
+
+    read_results, write_results = run_tests()
+
+    plot_results("Read", read_results)
+    plot_results("Write", write_results)
+
+    if dir == "horizontal":
+        print(latex_results_horizontal("Read", read_results))
+        print(latex_results_horizontal("Write", write_results))
+    else:
+        print(latex_results_vertical("Read", read_results))
+        print(latex_results_vertical("Write", write_results))
