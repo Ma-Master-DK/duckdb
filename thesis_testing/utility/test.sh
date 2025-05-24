@@ -6,7 +6,7 @@ DEV="/dev/nvme1n1"
 CUSTOM="../builds/duckdb_nvme"
 STANDARD="../builds/duckdb_file"
 sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100)
-RUNS=2
+RUNS=10
 RESULTS="../results/test_results.txt"
 
 if ! sudo -v; then
@@ -79,38 +79,38 @@ function run_read_benchmark() {
         echo
 }
 
-# function run_tpch_query() {
-#         local bin=$1
-#         local label=$2
-#         local query_num=$3
-#         local sf=$4
-#         local file=$5
-#         local tpch="tpch-$query_num.txt"
-#         local tpch_answer="tpch-answer-$query_num.txt"
-#
-#         echo "-----------------------------------"
-#         echo "Testing $label"
-#         local tpch_query="PRAGMA tpch($query_num);"
-#         local tpch_answer_query="FROM tpch_answers() WHERE query_nr=$query_num AND scale_factor=$sf;"
-#
-#         echo "$tpch_query" | $bin $file > "$tpch"
-#         echo "$tpch_answer_query" | $bin $file > "$tpch_answer"
-#
-#         python3 check_tpch.py "$tpch" "$tpch_answer"
-#
-#         STATUS=$?
-#
-#         if [ $STATUS -eq 0 ]; then
-#                 echo -e "\t✅ Output matches expected output"
-#         elif [ $STATUS -eq 2 ]; then
-#                 echo -e "\t❌ Output does not match expected output"
-#         else
-#                 echo -e "\t⚠ Error running the checker"
-#         fi
-#
-#         rm "$tpch"
-#         rm "$tpch_answer"
-# }
+function run_tpch_query() {
+        local bin=$1
+        local label=$2
+        local query_num=$3
+        local sf=$4
+        local file=$5
+        local tpch="tpch-$query_num.txt"
+        local tpch_answer="tpch-answer-$query_num.txt"
+
+        echo "-----------------------------------"
+        echo "Testing $label"
+        local tpch_query="PRAGMA tpch($query_num);"
+        local tpch_answer_query="FROM tpch_answers() WHERE query_nr=$query_num AND scale_factor=$sf;"
+
+        echo "$tpch_query" | $bin $file > "$tpch"
+        echo "$tpch_answer_query" | $bin $file > "$tpch_answer"
+
+        python3 check_tpch.py "$tpch" "$tpch_answer"
+
+        STATUS=$?
+
+        if [ $STATUS -eq 0 ]; then
+                echo -e "\t✅ Output matches expected output"
+        elif [ $STATUS -eq 2 ]; then
+                echo -e "\t❌ Output does not match expected output"
+        else
+                echo -e "\t⚠ Error running the checker"
+        fi
+
+        rm "$tpch"
+        rm "$tpch_answer"
+}
 
 #-------------------------------------------
 # RUN BENCHMARKS
@@ -127,9 +127,11 @@ for sf in "${sfs[@]}"; do
         run_write_benchmark "$STANDARD" "Standard DuckDB (Write)" "$sf" "$DB"
         run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
 
-        # echo "===> CHECKING IF DATABASE IS CORRECT!"
-        # run_tpch_query "$STANDARD" "Standard DuckDB (Test) tpch query 4" "4" "$sf" "$DB"
-        # run_tpch_query "$CUSTOM" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$DEV"
+        if echo "$sf <= 1" | bc -l | grep -q 1; then
+                echo "===> CHECKING IF DATABASE IS CORRECT!"
+                run_tpch_query "$STANDARD" "Standard DuckDB (Test) tpch query 4" "4" "$sf" "$DB"
+                run_tpch_query "$CUSTOM" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$DEV"
+        fi
 
         echo "===> READ-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
         run_read_benchmark "$STANDARD" "Standard DuckDB (Read)" "$DB"
