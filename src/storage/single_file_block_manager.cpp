@@ -207,10 +207,6 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 void SingleFileBlockManager::CreateNewDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
-	auto geo = xnvme_dev_get_geo(dev);
-	auto lba_size = geo->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -268,9 +264,6 @@ void SingleFileBlockManager::CreateNewDatabase() {
 void SingleFileBlockManager::LoadExistingDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
-	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
 
 	MainHeader::CheckMagicBytes(dev);
 
@@ -304,8 +297,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
 	// read the buffer from disk
-	block.Read(dev, location, *qpool);
-	qpool->Sync();
+	block.Read(dev, location);
 
 	// compute the checksum
 	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
@@ -325,7 +317,7 @@ void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t locati
 	Store<uint64_t>(checksum, block.InternalBuffer());
 
 	// now write the buffer
-	block.Write(dev, location, *qpool);
+	block.Write(dev, location);
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {
@@ -597,7 +589,7 @@ void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_blo
 
 	// read the buffer from disk
 	auto location = GetBlockLocation(start_block);
-	buffer.Read(dev, location, *qpool);
+	buffer.Read(dev, location);
 
 	// for each of the blocks - verify the checksum
 	auto ptr = buffer.InternalBuffer();
@@ -773,7 +765,6 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 }
 
 void SingleFileBlockManager::FileSync() {
-	qpool->Sync();
 }
 
 void SingleFileBlockManager::TrimFreeBlocks() {

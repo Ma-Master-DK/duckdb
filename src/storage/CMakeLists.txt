@@ -23,7 +23,6 @@ add_library_unity(
   standard_buffer_manager.cpp
   temporary_file_manager.cpp
   table_index_list.cpp
-  queue_pool.cpp
   write_ahead_log.cpp
   optimistic_data_writer.cpp
   partial_block_manager.cpp

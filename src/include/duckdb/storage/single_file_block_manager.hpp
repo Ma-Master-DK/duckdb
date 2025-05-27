@@ -123,7 +123,6 @@ private:
 	string path;
 	//! The file handle
 	xnvme_dev *dev;
-	unique_ptr<QueuePool> qpool;
 	//! The buffer used to read/write to the headers
 	FileBuffer header_buffer;
 	//! The list of free blocks that can be written to currently

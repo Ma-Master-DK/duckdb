@@ -10,7 +10,6 @@
 
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/debug_initialize.hpp"
-#include "duckdb/storage/queue_pool.hpp"
 
 #include <cstdint>
 #include <libxnvme.h>
@@ -47,10 +46,10 @@ public:
 public:
 	//! Read into the FileBuffer from the specified location.
 	void Read(FileHandle &handle, uint64_t location);
-	void Read(xnvme_dev *handle, uint64_t location, QueuePool &qpool);
+	void Read(xnvme_dev *handle, uint64_t location);
 	//! Write the contents of the FileBuffer to the specified location.
 	void Write(FileHandle &handle, uint64_t location);
-	void Write(xnvme_dev *handle, uint64_t location, QueuePool &qpool);
+	void Write(xnvme_dev *handle, uint64_t location);
 	void Close();
 	void CloseWithDev();
 

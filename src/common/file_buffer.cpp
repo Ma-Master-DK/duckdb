@@ -7,7 +7,6 @@
 #include "duckdb/common/helper.hpp"
 #include "duckdb/main/config.hpp"
 #include "duckdb/storage/storage_info.hpp"
-#include "duckdb/storage/queue_pool.hpp"
 #include <cstdint>
 #include <cstring>
 
@@ -115,7 +114,7 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	handle.Read(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Read(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// extract meta data from device
@@ -131,7 +130,10 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		qpool.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+
+		xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload,
+		               nullptr);
 	}
 }
 
@@ -140,7 +142,7 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	handle.Write(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Write(xnvme_dev *dev, uint64_t location) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// extract meta data from device
@@ -155,8 +157,15 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		auto offset = i * mdts_size;
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
+		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
 
-		qpool.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		int err = xnvme_nvm_write(&ctx, xnvme_dev_get_nsid(dev), lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1,
+		                          payload, nullptr);
+		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+			err = err ? err : -EIO;
+		}
 	}
 }
 
