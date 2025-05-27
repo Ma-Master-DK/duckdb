@@ -38,7 +38,7 @@ function run_write_benchmark() {
         echo "-----------------------------------"
         echo "Benchmark $label"
         for i in $(seq 1 $RUNS); do
-                if [ "$bin" = "$STANDARD" ]; then
+                if [ "$file" = "$DB" ]; then
                         remove_existing_db
                 fi
                 clear_caches
@@ -125,17 +125,17 @@ for sf in "${sfs[@]}"; do
         echo "sf: $sf" >> $RESULTS
         echo "===> WRITE-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
         run_write_benchmark "$STANDARD" "Standard DuckDB (Write)" "$sf" "$DB"
-        run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
+        run_write_benchmark "$CUSTOM -xsync" "xnvme DuckDB (Write) " "$sf" "$DB"
 
         if echo "$sf <= 1" | bc -l | grep -q 1; then
                 echo "===> CHECKING IF DATABASE IS CORRECT!"
                 run_tpch_query "$STANDARD" "Standard DuckDB (Test) tpch query 4" "4" "$sf" "$DB"
-                run_tpch_query "$CUSTOM" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$DEV"
+                run_tpch_query "$CUSTOM -xsync" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$DB"
         fi
 
         echo "===> READ-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
         run_read_benchmark "$STANDARD" "Standard DuckDB (Read)" "$DB"
-        run_read_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$DEV"
+        run_read_benchmark "$CUSTOM -xsync" "xnvme DuckDB (Read)" "$DB"
 
         remove_existing_db
 
