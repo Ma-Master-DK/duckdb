@@ -115,7 +115,7 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	handle.Read(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueueWrapper &queue) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// extract meta data from device
@@ -131,7 +131,7 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		qpool.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		queue.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
 	}
 }
 
@@ -140,7 +140,7 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	handle.Write(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueueWrapper &queue) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// extract meta data from device
@@ -156,7 +156,7 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		qpool.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		queue.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
 	}
 }
 

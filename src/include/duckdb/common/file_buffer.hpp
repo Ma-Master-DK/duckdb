@@ -47,10 +47,10 @@ public:
 public:
 	//! Read into the FileBuffer from the specified location.
 	void Read(FileHandle &handle, uint64_t location);
-	void Read(xnvme_dev *handle, uint64_t location, QueuePool &qpool);
+	void Read(xnvme_dev *handle, uint64_t location, QueueWrapper &queue);
 	//! Write the contents of the FileBuffer to the specified location.
 	void Write(FileHandle &handle, uint64_t location);
-	void Write(xnvme_dev *handle, uint64_t location, QueuePool &qpool);
+	void Write(xnvme_dev *handle, uint64_t location, QueueWrapper &queue);
 	void Close();
 	void CloseWithDev();
 

@@ -208,9 +208,8 @@ void SingleFileBlockManager::CreateNewDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
 	auto geo = xnvme_dev_get_geo(dev);
-	auto lba_size = geo->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
+	auto mdts_size = geo->mdts_nbytes;
+	queue = make_uniq<QueueWrapper>(dev, (uint16_t)(config.options.default_block_alloc_size / mdts_size) * 10);
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -269,8 +268,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
 	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
+	queue = make_uniq<QueueWrapper>(dev, (uint16_t)(config.options.default_block_alloc_size / lba_size) * 10);
 
 	MainHeader::CheckMagicBytes(dev);
 
@@ -304,8 +302,8 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
 	// read the buffer from disk
-	block.Read(dev, location, *qpool);
-	qpool->Sync();
+	block.Read(dev, location, *queue);
+	queue->Drain();
 
 	// compute the checksum
 	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
@@ -325,7 +323,7 @@ void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t locati
 	Store<uint64_t>(checksum, block.InternalBuffer());
 
 	// now write the buffer
-	block.Write(dev, location, *qpool);
+	block.Write(dev, location, *queue);
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {
@@ -597,7 +595,7 @@ void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_blo
 
 	// read the buffer from disk
 	auto location = GetBlockLocation(start_block);
-	buffer.Read(dev, location, *qpool);
+	buffer.Read(dev, location, *queue);
 
 	// for each of the blocks - verify the checksum
 	auto ptr = buffer.InternalBuffer();
@@ -773,7 +771,9 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 }
 
 void SingleFileBlockManager::FileSync() {
-	qpool->Sync();
+	while (!queue->CheckCompletion()) {
+		queue->Poke();
+	}
 }
 
 void SingleFileBlockManager::TrimFreeBlocks() {
