@@ -11,28 +11,6 @@ QueuePool::QueuePool(struct xnvme_dev *dev, int pool_size, uint16_t qdepth) {
 	}
 }
 
-void QueuePool::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
-	while (true) {
-		for (auto &qwrap_ptr : queues) {
-			if (qwrap_ptr->SubmitRead(dev, lba_location, amount, payload) == 0) {
-				return;
-			}
-		}
-	}
-}
-
-void QueuePool::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
-	while (true) {
-		for (auto &qwrap_ptr : queues) {
-			if (qwrap_ptr->SubmitWrite(dev, lba_location, amount, payload) == 0) {
-				return;
-			} else {
-				qwrap_ptr->Poke();
-			}
-		}
-	}
-}
-
 void QueuePool::Close() {
 	for (auto &qwrap_ptr : queues) {
 		qwrap_ptr->Close();
@@ -42,6 +20,19 @@ void QueuePool::Close() {
 void QueuePool::Sync() {
 	for (auto &qwrap_ptr : queues) {
 		qwrap_ptr->Sync();
+	}
+}
+
+QueueWrapper *QueuePool::GetQueue() {
+	while (true) {
+		for (auto &qp : queues) {
+			auto &q = *qp;
+			if (q.TryLock()) {
+				return &q;
+			} else {
+				q.Poke();
+			}
+		}
 	}
 }
 
@@ -58,12 +49,7 @@ QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth, int id) {
 
 bool QueueWrapper::TryLock() {
 	if (queue && mtx.try_lock()) {
-		if (args.inflight < qdepth) {
-			return true;
-		} else {
-			mtx.unlock();
-			return false;
-		}
+		return true;
 	}
 	return false;
 }
@@ -82,15 +68,15 @@ void QueueWrapper::Poke() {
 
 void QueueWrapper::Sync() {
 	if (queue) {
+		mtx.lock();
 		Drain();
+		mtx.unlock();
 	}
 }
 
 int QueueWrapper::Drain() {
 	if (queue) {
-		mtx.lock();
 		auto res = xnvme_queue_drain(queue);
-		mtx.unlock();
 		return res;
 	}
 
@@ -109,20 +95,14 @@ void QueueWrapper::Close() {
 
 int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	if (queue) {
-		if (TryLock()) {
-			struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 
-			int err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
-			if (err == 0) {
-				args.submitted++;
-				args.inflight++;
-			}
-
-			mtx.unlock();
-			return err;
-		} else {
-			return -1;
+		int err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
+		if (err == 0) {
+			args.submitted++;
 		}
+
+		return err;
 	}
 
 	return -1;
@@ -130,21 +110,14 @@ int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amo
 
 int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
 	if (queue) {
-		if (TryLock()) {
-			struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 
-			int err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
-			if (err == 0) {
-				args.submitted++;
-				args.inflight++;
-			}
-
-			mtx.unlock();
-			return err;
-
-		} else {
-			return -1;
+		int err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location, amount, payload, nullptr);
+		if (err == 0) {
+			args.submitted++;
 		}
+
+		return err;
 	}
 
 	return -1;

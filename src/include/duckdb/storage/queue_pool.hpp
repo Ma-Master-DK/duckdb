@@ -11,7 +11,6 @@ namespace duckdb {
 struct cb_args {
 	uint32_t submitted = 0;
 	uint32_t completed = 0;
-	uint32_t inflight = 0;
 };
 
 class QueueWrapper {
@@ -28,6 +27,11 @@ public:
 		Close();
 	};
 
+	bool TryLock();
+	void Unlock() {
+		mtx.unlock();
+	}
+
 	int GetID();
 	void Poke();
 	void Sync();
@@ -38,12 +42,9 @@ public:
 	int SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
 
 protected:
-	bool TryLock();
-
 	static void cb_func(struct xnvme_cmd_ctx *ctx, void *cb_arg) {
 		struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
 		cb_args->completed++;
-		cb_args->inflight--;
 
 		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 	}
@@ -56,8 +57,7 @@ public:
 		Close();
 	};
 
-	void SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
-	void SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload);
+	QueueWrapper *GetQueue();
 
 	void Sync();
 

@@ -126,13 +126,22 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
+	QueueWrapper *queue = qpool.GetQueue();
+
 	for (uint64_t i = 0; i < submissions; i++) {
 		auto offset = i * mdts_size;
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		qpool.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		int err = queue->SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+
+		if (err) {
+			xnvme_cli_perr("xnvme_nvm_read()", err);
+		}
 	}
+
+	queue->Drain();
+	queue->Unlock();
 }
 
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
@@ -151,25 +160,34 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
 	auto lbas_pr_mdts = mdts_size / lba_size;
 	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
 
+	QueueWrapper *queue = qpool.GetQueue();
+
 	for (uint64_t i = 0; i < submissions; i++) {
 		auto offset = i * mdts_size;
 		auto *payload = internal_buffer + offset;
 		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
 
-		qpool.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		int err = queue->SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+
+		if (err) {
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+		}
 	}
+
+	queue->Drain();
+	queue->Unlock();
 }
 
 void FileBuffer::Clear() {
-	memset(internal_buffer, 0, internal_size);
+	xnvme_buf_clear(internal_buffer, internal_size);
 }
 
 void FileBuffer::Initialize(DebugInitialize initialize) {
 	if (initialize == DebugInitialize::NO_INITIALIZE) {
 		return;
 	}
-	uint8_t value = initialize == DebugInitialize::DEBUG_ZERO_INITIALIZE ? 0 : 0xFF;
-	memset(internal_buffer, value, internal_size);
+	const char value = initialize == DebugInitialize::DEBUG_ZERO_INITIALIZE ? 0 : 0xFF;
+	xnvme_buf_fill(internal_buffer, internal_size, &value);
 }
 
 } // namespace duckdb

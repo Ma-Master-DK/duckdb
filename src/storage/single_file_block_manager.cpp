@@ -275,6 +275,7 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 	MainHeader::CheckMagicBytes(dev);
 
 	// otherwise, we check the metadata of the file
+	header_buffer.Clear();
 	ReadAndChecksum(header_buffer, 0);
 	MainHeader main_header = DeserializeMainHeader(header_buffer.buffer);
 	options.version_number = main_header.version_number;
