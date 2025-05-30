@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <libxnvme.h>
+#include <mutex>
 #include "duckdb/common/helper.hpp"
 
 namespace duckdb {
@@ -16,6 +18,7 @@ private:
 	uint32_t qdepth;
 	struct xnvme_queue *queue;
 	struct cb_args args;
+	std::mutex mtx;
 
 public:
 	QueueWrapper(xnvme_dev *dev, uint16_t qdepth);
@@ -36,8 +39,14 @@ public:
 
 protected:
 	static void cb_func(struct xnvme_cmd_ctx *ctx, void *cb_arg) {
-		struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
-		cb_args->completed++;
+		if (xnvme_cmd_ctx_cpl_status(ctx)) {
+			xnvme_cli_pinf("Command did not complete succesfully");
+			xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
+		} else {
+			// xnvme_cli_pinf("Command completed succesfully");
+			struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
+			cb_args->completed++;
+		}
 
 		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 	}

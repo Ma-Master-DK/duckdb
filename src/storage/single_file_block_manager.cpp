@@ -164,6 +164,7 @@ SingleFileBlockManager::SingleFileBlockManager(AttachedDatabase &db, const strin
 
 SingleFileBlockManager::~SingleFileBlockManager() {
 	header_buffer.Close();
+	queue->Close();
 }
 
 FileOpenFlags SingleFileBlockManager::GetFileFlags(bool create_new) const {
@@ -207,9 +208,7 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 void SingleFileBlockManager::CreateNewDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
-	auto geo = xnvme_dev_get_geo(dev);
-	auto mdts_size = geo->mdts_nbytes;
-	queue = make_uniq<QueueWrapper>(dev, (uint16_t)(config.options.default_block_alloc_size / mdts_size) * 10);
+	queue = make_uniq<QueueWrapper>(dev, (uint16_t)64);
 
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
@@ -267,8 +266,7 @@ void SingleFileBlockManager::CreateNewDatabase() {
 void SingleFileBlockManager::LoadExistingDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
-	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
-	queue = make_uniq<QueueWrapper>(dev, (uint16_t)(config.options.default_block_alloc_size / lba_size) * 10);
+	queue = make_uniq<QueueWrapper>(dev, (uint16_t)64);
 
 	MainHeader::CheckMagicBytes(dev);
 
@@ -772,7 +770,7 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 
 void SingleFileBlockManager::FileSync() {
 	while (!queue->CheckCompletion()) {
-		queue->Poke();
+		queue->Drain();
 	}
 }
 

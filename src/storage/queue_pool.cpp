@@ -14,19 +14,30 @@ QueueWrapper::QueueWrapper(xnvme_dev *dev, uint16_t qdepth) {
 }
 
 void QueueWrapper::Poke() {
+	mtx.lock();
 	xnvme_queue_poke(queue, 0);
+	mtx.unlock();
 }
 
 int QueueWrapper::Drain() {
-	auto res = xnvme_queue_drain(queue);
-	return res;
+	mtx.lock();
+	int err = xnvme_queue_drain(queue);
+	mtx.unlock();
+	return err;
 }
 
 void QueueWrapper::Close() {
-	xnvme_queue_term(queue);
+	if (queue) {
+		while (args.completed != args.submitted) {
+			this->Drain();
+		}
+		xnvme_queue_term(queue);
+		queue = nullptr;
+	}
 }
 
 int QueueWrapper::SubmitRead(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+	mtx.lock();
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 
 submit:
@@ -45,10 +56,12 @@ submit:
 		break;
 	}
 
+	mtx.unlock();
 	return err;
 }
 
 int QueueWrapper::SubmitWrite(xnvme_dev *dev, uint64_t lba_location, uint16_t amount, data_ptr_t payload) {
+	mtx.lock();
 	struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
 
 submit:
@@ -67,6 +80,7 @@ submit:
 		break;
 	}
 
+	mtx.unlock();
 	return err;
 }
 

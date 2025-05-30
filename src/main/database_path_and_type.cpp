@@ -36,7 +36,9 @@ void DBPathAndType::ResolveDatabaseType(FileSystem &fs, string &path, string &db
 		return;
 	}
 	// check database type by reading the magic bytes of a file
-	DBPathAndType::CheckMagicBytes(fs, path, db_type);
+	if (!(path == "/dev/ng1n1")) {
+		DBPathAndType::CheckMagicBytes(fs, path, db_type);
+	}
 }
 
 } // namespace duckdb

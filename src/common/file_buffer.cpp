@@ -133,6 +133,8 @@ void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueueWrapper &queue) {
 
 		queue.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
 	}
+
+	queue.Drain();
 }
 
 void FileBuffer::Write(FileHandle &handle, uint64_t location) {
@@ -158,6 +160,7 @@ void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueueWrapper &queue) {
 
 		queue.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
 	}
+	queue.Drain();
 }
 
 void FileBuffer::Clear() {
