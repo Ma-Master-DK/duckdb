@@ -43,8 +43,15 @@ public:
 
 protected:
 	static void cb_func(struct xnvme_cmd_ctx *ctx, void *cb_arg) {
-		struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
-		cb_args->completed++;
+		auto err = xnvme_cmd_ctx_cpl_status(ctx);
+		if (err) {
+			xnvme_cli_perr("Command did not complete successfully", err);
+			xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
+		} else {
+			xnvme_cli_pinf("Command completed succesfully");
+			struct cb_args *cb_args = static_cast<struct cb_args *>(cb_arg);
+			cb_args->completed++;
+		}
 
 		xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 	}
