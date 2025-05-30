@@ -421,7 +421,7 @@ void DatabaseInstance::Configure(DBConfig &new_config, const char *database_path
 
 		xnvme_opts opts = xnvme_opts_default();
 		opts.be = "linux";
-		opts.async = "io_uring";
+		opts.async = "io_uring_cmd";
 		config.options.dev = xnvme_dev_open(database_path, &opts);
 		config.options.geo = xnvme_dev_get_geo(config.options.dev);
 		xnvme_queue_init(config.options.dev, (uint16_t)64, 0, &queue_ptr);
