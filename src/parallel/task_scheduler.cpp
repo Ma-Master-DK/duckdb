@@ -1,10 +1,12 @@
 #include "duckdb/parallel/task_scheduler.hpp"
+#include "duckdb/parallel/global.hpp"
 
 #include "duckdb/common/chrono.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/numeric_utils.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
+#include <libxnvme.h>
 
 #ifndef DUCKDB_NO_THREADS
 #include "concurrentqueue.h"
@@ -31,6 +33,7 @@ struct SchedulerThread {
 	}
 
 	unique_ptr<thread> internal_thread;
+
 #endif
 };
 
@@ -207,6 +210,11 @@ void TaskScheduler::ExecuteForever(atomic<bool> *marker) {
 		Allocator::ThreadFlush(allocator_background_threads, 0, NumericCast<idx_t>(requested_thread_count.load()));
 		Allocator::ThreadIdle();
 	}
+	if (queue_ptr) {
+		xnvme_queue_drain(queue_ptr);
+		xnvme_queue_term(queue_ptr);
+		queue_ptr = nullptr;
+	}
 #else
 	throw NotImplementedException("DuckDB was compiled without threads! Background thread loop is not allowed.");
 #endif
@@ -275,7 +283,9 @@ void TaskScheduler::ExecuteTasks(idx_t max_tasks) {
 }
 
 #ifndef DUCKDB_NO_THREADS
-static void ThreadExecuteTasks(TaskScheduler *scheduler, atomic<bool> *marker) {
+static void ThreadExecuteTasks(TaskScheduler *scheduler, atomic<bool> *marker, xnvme_dev *dev) {
+	xnvme_queue_init(dev, (uint16_t)64, 0, &queue_ptr);
+	xnvme_queue_set_cb(queue_ptr, cb_fn, nullptr);
 	scheduler->ExecuteForever(marker);
 }
 #endif
@@ -429,7 +439,7 @@ void TaskScheduler::RelaunchThreadsInternal(int32_t n) {
 			auto marker = unique_ptr<atomic<bool>>(new atomic<bool>(true));
 			unique_ptr<thread> worker_thread;
 			try {
-				worker_thread = make_uniq<thread>(ThreadExecuteTasks, this, marker.get());
+				worker_thread = make_uniq<thread>(ThreadExecuteTasks, this, marker.get(), config.options.dev);
 			} catch (std::exception &ex) {
 				// thread constructor failed - this can happen when the system has too many threads allocated
 				// in this case we cannot allocate more threads - stop launching them

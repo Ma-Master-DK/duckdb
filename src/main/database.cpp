@@ -1,4 +1,5 @@
 #include "duckdb/main/database.hpp"
+#include "duckdb/parallel/global.hpp"
 
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/virtual_file_system.hpp"
@@ -28,6 +29,7 @@
 #include "duckdb/main/capi/extension_api.hpp"
 #include "duckdb/storage/compression/empty_validity.hpp"
 #include "duckdb/logging/logger.hpp"
+#include <libxnvme.h>
 
 #ifndef DUCKDB_NO_THREADS
 #include "duckdb/common/thread.hpp"
@@ -89,6 +91,8 @@ DatabaseInstance::~DatabaseInstance() {
 	Allocator::SetBackgroundThreads(false);
 	// after all destruction is complete clear the cache entry
 	config.db_cache_entry.reset();
+	xnvme_queue_drain(queue_ptr);
+	xnvme_queue_term(queue_ptr);
 	xnvme_dev_close(config.options.dev);
 }
 
@@ -419,6 +423,9 @@ void DatabaseInstance::Configure(DBConfig &new_config, const char *database_path
 		opts.be = "linux";
 		opts.async = "io_uring";
 		config.options.dev = xnvme_dev_open(database_path, &opts);
+		config.options.geo = xnvme_dev_get_geo(config.options.dev);
+		xnvme_queue_init(config.options.dev, (uint16_t)64, 0, &queue_ptr);
+		xnvme_queue_set_cb(queue_ptr, cb_fn, nullptr);
 		if (!config.options.dev) {
 			xnvme_cli_perr("xnvme_dev_open()", errno);
 			return;

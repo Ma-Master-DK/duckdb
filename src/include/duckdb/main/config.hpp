@@ -125,6 +125,8 @@ protected:
 struct DBConfigOptions {
 	bool new_db = false;
 	xnvme_dev *dev = nullptr;
+	const xnvme_geo *geo;
+
 	//! Database file path. May be empty for in-memory mode
 	string database_path;
 	//! Database type. If empty, automatically extracted from `database_path`, where a `type:path` syntax is expected

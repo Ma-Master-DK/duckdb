@@ -6,6 +6,7 @@ add_library_unity(
   executor_task.cpp
   executor.cpp
   event.cpp
+  global.cpp
   interrupt.cpp
   pipeline.cpp
   pipeline_complete_event.cpp

@@ -1,4 +1,5 @@
 #include "duckdb/storage/single_file_block_manager.hpp"
+#include "duckdb/parallel/global.hpp"
 
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/checksum.hpp"
@@ -205,13 +206,6 @@ MainHeader ConstructMainHeader(idx_t version_number) {
 }
 
 void SingleFileBlockManager::CreateNewDatabase() {
-	auto &config = DBConfig::Get(db);
-	dev = config.options.dev;
-	auto geo = xnvme_dev_get_geo(dev);
-	auto lba_size = geo->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
-
 	// if we create a new file, we fill the metadata of the file
 	// first fill in the new header
 	header_buffer.Clear();
@@ -268,9 +262,6 @@ void SingleFileBlockManager::CreateNewDatabase() {
 void SingleFileBlockManager::LoadExistingDatabase() {
 	auto &config = DBConfig::Get(db);
 	dev = config.options.dev;
-	auto lba_size = xnvme_dev_get_geo(dev)->nbytes;
-	qpool = make_uniq<QueuePool>(dev, (int)config.options.maximum_threads,
-	                             (uint16_t)(config.options.default_block_alloc_size / lba_size));
 
 	MainHeader::CheckMagicBytes(dev);
 
@@ -304,8 +295,9 @@ void SingleFileBlockManager::LoadExistingDatabase() {
 
 void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t location) const {
 	// read the buffer from disk
-	block.Read(dev, location, *qpool);
-	qpool->Sync();
+	auto &config = DBConfig::Get(db);
+	block.Read(dev, location, config.options.geo);
+	xnvme_queue_drain(queue_ptr);
 
 	// compute the checksum
 	auto stored_checksum = Load<uint64_t>(block.InternalBuffer());
@@ -321,11 +313,12 @@ void SingleFileBlockManager::ReadAndChecksum(FileBuffer &block, uint64_t locatio
 
 void SingleFileBlockManager::ChecksumAndWrite(FileBuffer &block, uint64_t location) const {
 	// compute the checksum and write it to the start of the buffer (if not temp buffer)
+	auto &config = DBConfig::Get(db);
 	uint64_t checksum = Checksum(block.buffer, block.Size());
 	Store<uint64_t>(checksum, block.InternalBuffer());
 
 	// now write the buffer
-	block.Write(dev, location, *qpool);
+	block.Write(dev, location, config.options.geo);
 }
 
 void SingleFileBlockManager::Initialize(const DatabaseHeader &header, const optional_idx block_alloc_size) {
@@ -594,10 +587,11 @@ void SingleFileBlockManager::Read(Block &block) {
 void SingleFileBlockManager::ReadBlocks(FileBuffer &buffer, block_id_t start_block, idx_t block_count) {
 	D_ASSERT(start_block >= 0);
 	D_ASSERT(block_count >= 1);
+	DBConfig &config = DBConfig::Get(db);
 
 	// read the buffer from disk
 	auto location = GetBlockLocation(start_block);
-	buffer.Read(dev, location, *qpool);
+	buffer.Read(dev, location, config.options.geo);
 
 	// for each of the blocks - verify the checksum
 	auto ptr = buffer.InternalBuffer();
@@ -773,7 +767,7 @@ void SingleFileBlockManager::WriteHeader(DatabaseHeader header) {
 }
 
 void SingleFileBlockManager::FileSync() {
-	qpool->Sync();
+	xnvme_queue_drain(queue_ptr);
 }
 
 void SingleFileBlockManager::TrimFreeBlocks() {

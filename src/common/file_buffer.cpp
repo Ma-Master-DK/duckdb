@@ -1,4 +1,5 @@
 #include "duckdb/common/file_buffer.hpp"
+#include "duckdb/parallel/global.hpp"
 
 #include "duckdb/common/allocator.hpp"
 #include "duckdb/common/checksum.hpp"
@@ -7,7 +8,6 @@
 #include "duckdb/common/helper.hpp"
 #include "duckdb/main/config.hpp"
 #include "duckdb/storage/storage_info.hpp"
-#include "duckdb/storage/queue_pool.hpp"
 #include <cstdint>
 #include <cstring>
 
@@ -115,23 +115,41 @@ void FileBuffer::Read(FileHandle &handle, uint64_t location) {
 	handle.Read(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Read(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Read(xnvme_dev *dev, uint64_t location, const xnvme_geo *geo) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
-	// extract meta data from device
-	auto geo = xnvme_dev_get_geo(dev);
-	auto lba_size = geo->nbytes;
-	auto lba_location = location / lba_size;
-	auto mdts_size = geo->mdts_nbytes;
-	auto lbas_pr_mdts = mdts_size / lba_size;
-	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
+	auto lbas_pr_mdts = geo->mdts_nbytes / geo->lba_nbytes;
+	auto lba_location = location / geo->lba_nbytes;
+	uint64_t submissions = 1 + ((internal_size - 1) / geo->mdts_nbytes);
 
 	for (uint64_t i = 0; i < submissions; i++) {
-		auto offset = i * mdts_size;
+		auto offset = i * geo->mdts_nbytes;
 		auto *payload = internal_buffer + offset;
-		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
+		auto lbas =
+		    internal_size - offset >= geo->mdts_nbytes ? lbas_pr_mdts : (internal_size - offset) / geo->lba_nbytes;
 
-		qpool.SubmitRead(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue_ptr);
+
+	submit:
+		int err = xnvme_nvm_read(ctx, xnvme_dev_get_nsid(dev), lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1,
+		                         payload, nullptr);
+		switch (err) {
+		case 0:
+			break;
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue_ptr, 0);
+			goto submit;
+		default:
+			xnvme_cli_perr("xnvme_nvm_read()", err);
+			xnvme_queue_put_cmd_ctx(queue_ptr, ctx);
+			break;
+		}
+	}
+
+	int ret = xnvme_queue_drain(queue_ptr);
+	if (ret < 0) {
+		xnvme_cli_perr("xnvme_queue_drain()", ret);
 	}
 }
 
@@ -140,23 +158,42 @@ void FileBuffer::Write(FileHandle &handle, uint64_t location) {
 	handle.Write(internal_buffer, internal_size, location);
 }
 
-void FileBuffer::Write(xnvme_dev *dev, uint64_t location, QueuePool &qpool) {
+void FileBuffer::Write(xnvme_dev *dev, uint64_t location, const xnvme_geo *geo) {
 	D_ASSERT(type != FileBufferType::TINY_BUFFER);
 
 	// extract meta data from device
-	auto geo = xnvme_dev_get_geo(dev);
-	auto lba_size = geo->nbytes;
-	auto lba_location = location / lba_size;
-	auto mdts_size = geo->mdts_nbytes;
-	auto lbas_pr_mdts = mdts_size / lba_size;
-	uint64_t submissions = 1 + ((internal_size - 1) / mdts_size);
+	auto lbas_pr_mdts = geo->mdts_nbytes / geo->lba_nbytes;
+	auto lba_location = location / geo->lba_nbytes;
+	uint64_t submissions = 1 + ((internal_size - 1) / geo->mdts_nbytes);
 
 	for (uint64_t i = 0; i < submissions; i++) {
-		auto offset = i * mdts_size;
+		auto offset = i * geo->mdts_nbytes;
 		auto *payload = internal_buffer + offset;
-		auto lbas = internal_size - offset >= mdts_size ? lbas_pr_mdts : (internal_size - offset) / lba_size;
+		auto lbas =
+		    internal_size - offset >= geo->mdts_nbytes ? lbas_pr_mdts : (internal_size - offset) / geo->lba_nbytes;
 
-		qpool.SubmitWrite(dev, lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1, payload);
+		struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue_ptr);
+
+	submit:
+		int err = xnvme_nvm_write(ctx, xnvme_dev_get_nsid(dev), lba_location + i * lbas_pr_mdts, (uint16_t)lbas - 1,
+		                          payload, nullptr);
+		switch (err) {
+		case 0:
+			break;
+		case -EBUSY:
+		case -EAGAIN:
+			xnvme_queue_poke(queue_ptr, 0);
+			goto submit;
+		default:
+			xnvme_cli_perr("xnvme_nvm_write()", err);
+			xnvme_queue_put_cmd_ctx(queue_ptr, ctx);
+			break;
+		}
+	}
+
+	int ret = xnvme_queue_drain(queue_ptr);
+	if (ret < 0) {
+		xnvme_cli_perr("xnvme_queue_drain()", ret);
 	}
 }
 
