@@ -5,7 +5,7 @@
 namespace duckdb {
 
 DataFileType MagicBytes::CheckMagicBytes(FileSystem &fs, const string &path) {
-	if (path.empty() || path == IN_MEMORY_PATH) {
+	if (path.empty() || path == IN_MEMORY_PATH || path.rfind("/dev/", 0) == 0) {
 		return DataFileType::DUCKDB_FILE;
 	}
 	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ | FileFlags::FILE_FLAGS_NULL_IF_NOT_EXISTS);
