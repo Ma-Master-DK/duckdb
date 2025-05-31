@@ -48,13 +48,7 @@ function run_write_benchmark() {
         clear_caches
         echo -e "\tRunning query..."
         result=$(echo "$query" | $bin $file)
-        time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
-        echo -e "\t\tRun 1: $time_s s"
-        total_s=$(echo "$total_s + $time_s" | bc)
-
-        avg=$(echo "scale=3; $total_s / 1" | bc)
-	echo "$avg" >> $RESULTS
-        echo -e "\nAverage time for $label: $avg s"
+        echo -e "\tDone generating data."
         echo
 }
 
