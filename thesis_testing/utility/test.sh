@@ -2,7 +2,7 @@
 
 # Configuration
 DB="benchmark.duckdb"
-DEV="/dev/nvme1n1"
+DEV="/dev/ng1n1"
 CUSTOM="../builds/duckdb_nvme"
 STANDARD="../builds/duckdb_file"
 sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100)
@@ -37,19 +37,17 @@ function run_write_benchmark() {
 
         echo "-----------------------------------"
         echo "Benchmark $label"
-        for i in $(seq 1 $RUNS); do
-                if [ "$file" = "$DB" ]; then
-                        remove_existing_db
-                fi
-                clear_caches
-                echo -e "\tRunning query..."
-                result=$(echo "$query" | $bin $file)
-                time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
-                echo -e "\t\tRun $i: $time_s s"
-                total_s=$(echo "$total_s + $time_s" | bc)
-        done
+        if [ "$file" = "$DB" ]; then
+                remove_existing_db
+        fi
+        clear_caches
+        echo -e "\tRunning query..."
+        result=$(echo "$query" | $bin $file)
+        time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
+        echo -e "\t\tRun 1: $time_s s"
+        total_s=$(echo "$total_s + $time_s" | bc)
 
-        avg=$(echo "scale=3; $total_s / $RUNS" | bc)
+        avg=$(echo "scale=3; $total_s / 1" | bc)
 	echo "$avg" >> $RESULTS
         echo -e "\nAverage time for $label: $avg s"
         echo
