@@ -417,7 +417,6 @@ void DatabaseInstance::Configure(DBConfig &new_config, const char *database_path
 
 		xnvme_opts opts = xnvme_opts_default();
 		opts.be = "linux";
-		opts.async = "io_uring";
 		config.options.dev = xnvme_dev_open(database_path, &opts);
 		if (!config.options.dev) {
 			xnvme_cli_perr("xnvme_dev_open()", errno);
