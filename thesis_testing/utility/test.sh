@@ -40,7 +40,12 @@ function run_write_benchmark() {
         local sf=$3
         local file=$4
         local total_s=0
-        local query="EXPLAIN ANALYZE CALL dbgen(sf=$sf);"
+        local steps=10
+        local query=""
+
+        for ((step=0; step<steps; step++)); do
+                query+="CALL dbgen(sf=$sf, children=$steps, step=$step); "
+        done
 
         echo "-----------------------------------"
         echo "Benchmark $label"
