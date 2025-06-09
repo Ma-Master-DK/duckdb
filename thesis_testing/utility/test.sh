@@ -5,14 +5,14 @@ DB="benchmark.duckdb"
 DEV="/dev/nvme1n1"
 CHAR_DEV="/dev/ng1n1"
 STANDARD="../builds/duckdb_standard"
-NVME_FILE="../build/duckdb_xnvme_file"
-NVME_SYNC="../build/duckdb_xnvme_sync"
-NVME_ASYNC_SQUEUE="../build/duckdb_xnvme_async_squeue"
-NVME_ASYNC_MQUEUE="../build/duckdb_xnvme_async_mqueue"
-NVME_ASYNC_TQUEUE="../build/duckdb_xnvme_async_tqueue"
-NVME_ASYNC_TQUEUE_NO_PASSTHROUGH="../build/duckdb_xnvme_async_tqueue_no_passthrough"
+NVME_FILE="../builds/duckdb_xnvme_file"
+NVME_SYNC="../builds/duckdb_xnvme_sync"
+NVME_ASYNC_SQUEUE="../builds/duckdb_xnvme_async_squeue"
+NVME_ASYNC_MQUEUE="../builds/duckdb_xnvme_async_mqueue"
+NVME_ASYNC_TQUEUE="../builds/duckdb_xnvme_async_tqueue"
+NVME_ASYNC_TQUEUE_NO_PASSTHROUGH="../builds/duckdb_xnvme_async_tqueue_no_passthrough"
 
-sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100 200 300)
+sfs=(0.01 0.1 1 2)
 RUNS=100
 RESULTS="../results/test_results.txt"
 
@@ -42,9 +42,13 @@ function run_write_benchmark() {
         local steps=10
         local query=""
 
-        for ((step=0; step<steps; step++)); do
-                query+="CALL dbgen(sf=$sf, children=$steps, step=$step); "
-        done
+        if echo "$sf < 100" | bc -l | grep -q 1; then
+                query="CALL dbgen(sf=$sf); "
+        else
+                for ((step=0; step<steps; step++)); do
+                        query+="CALL dbgen(sf=$sf, children=$steps, step=$step); "
+                done
+        fi
 
         echo "-----------------------------------"
         echo "Benchmark $label"
@@ -54,13 +58,6 @@ function run_write_benchmark() {
         clear_caches
         echo -e "\tRunning query..."
         result=$(echo "$query" | $bin $file)
-        time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
-        echo -e "\t\tRun 1: $time_s s"
-        total_s=$(echo "$total_s + $time_s" | bc)
-
-        avg=$(echo "scale=3; $total_s / 1" | bc)
-        echo -e "\nAverage time for $label: $avg s"
-        echo
 }
 
 function run_read_benchmark() {
