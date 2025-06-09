@@ -3,7 +3,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from experiment1.util import exp1_plot
+from experiment1.util import *
+from experiment2.util import *
 
 cur_dir = Path(".")
 show = False
@@ -50,5 +51,8 @@ if __name__ == "__main__":
 
     print("Presenting Experiment 1..")
     exp1_plot("Read Latency", results, True)
+
+    print("Presenting Experiment 2..")
+    exp2_plot("Read Latency", results, True)
 
     print("Done!")
