@@ -29,7 +29,6 @@ function remove_existing_db() {
 }
 
 function clear_caches() {
-        echo -e "\tClearing system cache..."
         sudo sync
         echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
 }
@@ -77,11 +76,9 @@ function run_read_benchmark() {
         for i in $(seq 1 $RUNS); do
                 echo -n " " >> $RESULTS
                 clear_caches
-                echo -e "\tRunning query..."
                 result=$(echo "$query" | $bin $file)
                 time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
                 echo -n "$time_s" >> $RESULTS
-                echo -e "\t\tRun $i: $time_s s"
                 total_s=$(echo "$total_s + $time_s" | bc)
         done
 
