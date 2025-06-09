@@ -2,11 +2,18 @@
 
 # Configuration
 DB="benchmark.duckdb"
-DEV="/dev/ng1n1"
-CUSTOM="../builds/duckdb_nvme"
-STANDARD="../builds/duckdb_file"
+DEV="/dev/nvme1n1"
+CHAR_DEV="/dev/ng1n1"
+STANDARD="../builds/duckdb_standard"
+NVME_FILE="../build/duckdb_xnvme_file"
+NVME_SYNC="../build/duckdb_xnvme_sync"
+NVME_ASYNC_SQUEUE="../build/duckdb_xnvme_async_squeue"
+NVME_ASYNC_MQUEUE="../build/duckdb_xnvme_async_mqueue"
+NVME_ASYNC_TQUEUE="../build/duckdb_xnvme_async_tqueue"
+NVME_ASYNC_TQUEUE_NO_PASSTHROUGH="../build/duckdb_xnvme_async_tqueue_no_passthrough"
+
 sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100)
-RUNS=10
+RUNS=50
 RESULTS="../results/test_results.txt"
 
 if ! sudo -v; then
@@ -48,7 +55,6 @@ function run_write_benchmark() {
         total_s=$(echo "$total_s + $time_s" | bc)
 
         avg=$(echo "scale=3; $total_s / 1" | bc)
-	echo "$avg" >> $RESULTS
         echo -e "\nAverage time for $label: $avg s"
         echo
 }
@@ -62,18 +68,21 @@ function run_read_benchmark() {
 
         echo "-----------------------------------"
         echo "Benchmark $label"
+        echo -n "$label" >> $RESULTS
         for i in $(seq 1 $RUNS); do
+                echo -n " " >> $RESULTS
                 clear_caches
                 echo -e "\tRunning query..."
                 result=$(echo "$query" | $bin $file)
                 time_s=$(echo "$result" | grep "Total Time" | sed -E 's/[^0-9.]//g')
+                echo -n "$time_s" >> $RESULTS
                 echo -e "\t\tRun $i: $time_s s"
                 total_s=$(echo "$total_s + $time_s" | bc)
         done
 
         avg=$(echo "scale=3; $total_s / $RUNS" | bc)
-	echo "$avg" >> $RESULTS
         echo -e "\nAverage time for $label: $avg s"
+        echo "" >> $RESULTS
         echo
 }
 
@@ -123,17 +132,22 @@ for sf in "${sfs[@]}"; do
         echo "sf: $sf" >> $RESULTS
         echo "===> WRITE-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
         run_write_benchmark "$STANDARD" "Standard DuckDB (Write)" "$sf" "$DB"
-        run_write_benchmark "$CUSTOM -new" "xnvme DuckDB (Write) " "$sf" "$DEV"
+        run_write_benchmark "$NVME_ASYNC_TQUEUE -new" "xnvme DuckDB (Write) " "$sf" "$CHAR_DEV"
 
         if echo "$sf <= 1" | bc -l | grep -q 1; then
                 echo "===> CHECKING IF DATABASE IS CORRECT!"
                 run_tpch_query "$STANDARD" "Standard DuckDB (Test) tpch query 4" "4" "$sf" "$DB"
-                run_tpch_query "$CUSTOM" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$DEV"
+                run_tpch_query "$NVME_ASYNC_TQUEUE" "xnvme DuckDB (Test) tpch query 4" "4" "$sf" "$CHAR_DEV"
         fi
 
         echo "===> READ-INTENSIVE QUERY BENCHMARK! RUNS: $RUNS"
-        run_read_benchmark "$STANDARD" "Standard DuckDB (Read)" "$DB"
-        run_read_benchmark "$CUSTOM" "xnvme DuckDB (Read)" "$DEV"
+        run_read_benchmark "$STANDARD" "duckdb_standard" "$DB"
+        run_read_benchmark "$NVME_FILE -xsync" "duckdb_xnvme_file" "$DB"
+        run_read_benchmark "$NVME_SYNC" "duckdb_xnvme_sync" "$DEV"
+        run_read_benchmark "$NVME_ASYNC_SQUEUE" "duckdb_xnvme_async_squeue" "$CHAR_DEV"
+        run_read_benchmark "$NVME_ASYNC_MQUEUE" "duckdb_xnvme_async_mqueue" "$CHAR_DEV"
+        run_read_benchmark "$NVME_ASYNC_TQUEUE" "duckdb_xnvme_async_tqueue" "$CHAR_DEV"
+        run_read_benchmark "$NVME_ASYNC_TQUEUE_NO_PASSTHROUGH" "duckdb_xnvme_async_tqueue_no_passthrough" "$DEV"
 
         remove_existing_db
 
