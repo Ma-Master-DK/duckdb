@@ -43,3 +43,28 @@ def exp2_plot(title, results, show=False):
     else:
         print("\tSaving Plot as file.")
         plt.savefig("experiment2/plot")
+
+
+def exp2_table(results):
+    rows = results.keys()
+    cols = [
+        "duckdb_standard",
+        "duckdb_xnvme_file",
+        "duckdb_xnvme_sync",
+        "duckdb_xnvme_async_squeue",
+        "duckdb_xnvme_async_mqueue",
+        "duckdb_xnvme_async_tqueue",
+    ]
+
+    res = "Scale Factor"
+    for c in cols:
+        res += f",{c}"
+
+    for r in rows:
+        res += f"\n{r}"
+        for c in cols:
+            res += f",{round(statistics.mean(results[r][c]), 3)}"
+
+    print("\tSaving Table to file.")
+    with open("experiment2/table.csv", "w") as f:
+        f.write(res)

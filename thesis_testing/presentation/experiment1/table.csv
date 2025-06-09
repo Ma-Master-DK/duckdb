@@ -1,0 +1,5 @@
+Scale Factor,duckdb_xnvme_async_tqueue,duckdb_xnvme_async_tqueue_no_passthrough
+0.01,0.003,0.003
+0.1,0.006,0.005
+1.0,0.022,0.024
+2.0,0.02,0.023
