@@ -47,14 +47,14 @@ def parse_results(data_file):
 
 if __name__ == "__main__":
     print("Reading Results..")
-    results = parse_results(cur_dir / "../../../test/defense_experiments/results.txt")
+    results = parse_results(cur_dir / "../results/test_results.txt")
 
-    print("Presenting Experiment 1..")
+    print("\nPresenting Experiment 1..")
     exp1_plot("Read Latency", results)
     exp1_table(results)
 
-    print("Presenting Experiment 2..")
+    print("\nPresenting Experiment 2..")
     exp2_plot("Read Latency", results)
     exp2_table(results)
 
-    print("Done!")
+    print("\nDone!")

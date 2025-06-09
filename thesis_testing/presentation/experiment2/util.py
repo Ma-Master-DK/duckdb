@@ -3,8 +3,16 @@ import statistics
 import matplotlib.pyplot as plt
 import numpy as np
 
+sf_threshold = 10.0
+
+
+def clean_results(results):
+    return {k: v for k, v in results.items() if float(k) >= sf_threshold}
+
 
 def exp2_plot(title, results, show=False):
+    results = clean_results(results)
+
     labels = list(results.keys())
     x = np.arange(len(labels))
 
@@ -19,12 +27,12 @@ def exp2_plot(title, results, show=False):
     width = 0.15
     fix, ax = plt.subplots(figsize=(12, 6))
     _ = ax.bar(x - (width / 2 + width * 2), y1, width, label="Standard")
-    _ = ax.bar(x - (width / 2 + width), y2, width, label="NVMe File")
-    _ = ax.bar(x - (width / 2), y3, width, label="NVMe Sync")
-    _ = ax.bar(x + (width / 2), y4, width, label="NVMe Async, Single Queue")
-    _ = ax.bar(x + (width / 2 + width), y5, width, label="NVMe Async, Queue Pool")
+    _ = ax.bar(x - (width / 2 + width), y2, width, label="xNVMe File")
+    _ = ax.bar(x - (width / 2), y3, width, label="xNVMe Sync")
+    _ = ax.bar(x + (width / 2), y4, width, label="xNVMe Async, Single Queue")
+    _ = ax.bar(x + (width / 2 + width), y5, width, label="xNVMe Async, Queue Pool")
     _ = ax.bar(
-        x + (width / 2 + width * 2), y6, width, label="NVMe Async, Thread Queues"
+        x + (width / 2 + width * 2), y6, width, label="xNVMe Async, Thread Queues"
     )
 
     # labels and formatting
@@ -46,6 +54,8 @@ def exp2_plot(title, results, show=False):
 
 
 def exp2_table(results):
+    results = clean_results(results)
+
     rows = results.keys()
     cols = [
         "duckdb_standard",

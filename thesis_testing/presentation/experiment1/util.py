@@ -3,8 +3,16 @@ import statistics
 import matplotlib.pyplot as plt
 import numpy as np
 
+sf_threshold = 1.0
+
+
+def clean_results(results):
+    return {k: v for k, v in results.items() if float(k) >= sf_threshold}
+
 
 def exp1_plot(title, results, show=False):
+    results = clean_results(results)
+
     labels = list(results.keys())
     x = np.arange(len(labels))
 
@@ -17,8 +25,8 @@ def exp1_plot(title, results, show=False):
     # plot
     width = 0.35
     fix, ax = plt.subplots(figsize=(12, 6))
-    _ = ax.bar(x - width / 2, y1, width, label="NVMe no passthrough")
-    _ = ax.bar(x + width / 2, y2, width, label="NVMe with passthrough")
+    _ = ax.bar(x - width / 2, y1, width, label="xNVMe with passthrough")
+    _ = ax.bar(x + width / 2, y2, width, label="xNVMe no passthrough")
 
     # labels and formatting
     ax.set_xlabel("Scale Factor")
@@ -39,6 +47,8 @@ def exp1_plot(title, results, show=False):
 
 
 def exp1_table(results):
+    results = clean_results(results)
+
     rows = results.keys()
     cols = [
         "duckdb_xnvme_async_tqueue",

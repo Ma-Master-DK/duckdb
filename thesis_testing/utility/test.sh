@@ -12,7 +12,7 @@ NVME_ASYNC_MQUEUE="../builds/duckdb_xnvme_async_mqueue"
 NVME_ASYNC_TQUEUE="../builds/duckdb_xnvme_async_tqueue"
 NVME_ASYNC_TQUEUE_NO_PASSTHROUGH="../builds/duckdb_xnvme_async_tqueue_no_passthrough"
 
-sfs=(0.01 0.1 1 2 4 6 8 10 20 40 60 80 100 200 300)
+sfs=(80 100 200 300)
 RUNS=100
 RESULTS="../results/test_results.txt"
 
