@@ -57,4 +57,7 @@ if __name__ == "__main__":
     exp2_plot("Read Latency", results)
     exp2_table(results)
 
-    print("\nDone!")
+    print("Running Experiment 2 T-Test..")
+    exp2_ttest(results, alpha=0.05, show=True)
+
+    print("Done!")
