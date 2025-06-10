@@ -2,6 +2,10 @@ import statistics
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib.lines import Line2D
+from scipy.stats import levene, ttest_ind
 
 sf_threshold = 10.0
 
@@ -78,3 +82,148 @@ def exp2_table(results):
     print("\tSaving Table to file.")
     with open("experiment2/table.csv", "w") as f:
         f.write(res)
+
+
+def exp2_ttest(data, baseline_impl="duckdb_standard", alpha=0.05, show=False):
+    for _, value in data.items():
+        if "duckdb_xnvme_async_tqueue_no_passthrough" in value:
+            del value["duckdb_xnvme_async_tqueue_no_passthrough"]
+    labels = {
+        "duckdb_standard": "Standard",
+        "duckdb_xnvme_file": "File",
+        "duckdb_xnvme_sync": "Sync",
+        "duckdb_xnvme_async_squeue": "Async, Single Queue",
+        "duckdb_xnvme_async_mqueue": "Async, Queue Pool",
+        "duckdb_xnvme_async_tqueue": "Async, Thread Queues",
+    }
+    """
+    Plots boxplots of runtimes grouped by scale factor and implementation,
+    with asterisks showing significant one-tailed speedups/slowdowns vs. baseline.
+
+    Parameters:
+        data (dict): Nested dictionary with structure:
+                     {scale_factor: {implementation: [runtimes...]}}
+        baseline_impl (str): The key name for the baseline implementation
+    """
+    # Transform into long-form DataFrame
+    records = []
+    for scale, impls in data.items():
+        for impl, timings in impls.items():
+            for t in timings:
+                records.append(
+                    {
+                        "Scale Factor": scale,
+                        "Implementation": labels[impl],
+                        "Runtime": t,
+                    }
+                )
+    df = pd.DataFrame(records)
+
+    # Sort scales for consistent plotting
+    df["Scale Factor"] = pd.Categorical(
+        df["Scale Factor"], categories=sorted(data.keys(), key=int), ordered=True
+    )
+
+    # Compute one-tailed p-values
+    significance = {}
+    for scale in data:
+        base = data[scale][baseline_impl]
+        for impl in data[scale]:
+            if impl == baseline_impl:
+                continue
+            other = data[scale][impl]
+
+            _, p = levene(base, other)
+            if p > 0.05:
+                var_equal = True
+            else:
+                var_equal = False
+
+            t_stat, p_two_tailed = ttest_ind(base, other, equal_var=var_equal)
+
+            mean_base = pd.Series(base).mean()
+            mean_impl = pd.Series(other).mean()
+
+            if mean_impl < mean_base:
+                # Test for significant speedup
+                p_one_tailed = p_two_tailed / 2 if t_stat > 0 else 1.0
+                significance[(scale, impl)] = "**" if p_one_tailed < alpha else ""
+            else:
+                # Test for significant slowdown
+                p_one_tailed = p_two_tailed / 2 if t_stat < 0 else 1.0
+                significance[(scale, impl)] = "*" if p_one_tailed < alpha else ""
+
+    # Plot
+    plt.figure(figsize=(14, 6))
+    plt.subplots_adjust(bottom=0.2)
+    sns.barplot(
+        data=df,
+        x="Scale Factor",
+        y="Runtime",
+        hue="Implementation",
+        errorbar="se",
+    )
+    plt.title("Query Runtime per Implementation and Scale Factor (One-Tailed t-Test)")
+    # Add explanation as separate legend entries
+
+    # Combine implementation legend with significance markers
+    plt.legend(title="Implementation", bbox_to_anchor=(1.05, 1), loc="upper left")
+
+    # Add significance explanation to the plot
+    plt.figtext(
+        0.01,
+        0.01,
+        "* = significant slowdown (p>{:.2f})".format(1 - alpha),
+        ha="left",
+        fontsize=10,
+    )
+    plt.figtext(
+        0.3,
+        0.01,
+        "** = significant speedup (p<{:.2f})".format(alpha),
+        ha="left",
+        fontsize=10,
+    )
+    plt.figtext(
+        0.6,
+        0.01,
+        "| = Standard error of the mean",
+        ha="left",
+        fontsize=10,
+    )
+
+    for (scale, impl), mark in significance.items():
+        if mark:
+            # Get the position of the bar
+            scale_idx = list(sorted(data.keys(), key=int)).index(scale)
+            impl_idx = list(labels.keys()).index(impl)
+
+            # Get the height of the bar
+            group = df[
+                (df["Scale Factor"] == scale) & (df["Implementation"] == labels[impl])
+            ]
+            bar_height = group["Runtime"].mean()
+
+            # Calculate x-position based on hue ordering in seaborn
+            hue_offset = len(labels) / 2  # Number of bars in each group
+            width = 0.8 / len(labels)  # Width of each bar
+            x_pos = scale_idx + (impl_idx - hue_offset + 0.5) * width
+
+            # Place text above the bar
+            plt.text(
+                x_pos,
+                bar_height * 1.05,
+                mark,
+                ha="center",
+                fontsize=12,
+                fontweight="bold",
+            )
+
+    y_max = df["Runtime"].max()  # 5% padding
+    plt.ylim(0, y_max)
+
+    plt.tight_layout()
+    if show:
+        plt.show()
+    else:
+        plt.savefig("ttest_plot.png")
