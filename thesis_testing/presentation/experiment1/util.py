@@ -25,8 +25,8 @@ def exp1_plot(title, results, show=False):
     # plot
     width = 0.35
     fix, ax = plt.subplots(figsize=(12, 6))
-    _ = ax.bar(x - width / 2, y1, width, label="xNVMe with passthrough")
-    _ = ax.bar(x + width / 2, y2, width, label="xNVMe no passthrough")
+    _ = ax.bar(x - width / 2, y1, width, label="NVMe passthrough")
+    _ = ax.bar(x + width / 2, y2, width, label="NVMe no passthrough")
 
     # labels and formatting
     ax.set_xlabel("Scale Factor")
