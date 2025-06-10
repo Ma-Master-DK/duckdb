@@ -50,14 +50,46 @@ if __name__ == "__main__":
     results = parse_results(cur_dir / "../results/test_results.txt")
 
     print("\nPresenting Experiment 1..")
-    exp1_plot("Read Latency", results)
+    # exp1_plot("Read Latency", results)
+    exp2_ttest(
+        results,
+        baseline_impl="duckdb_xnvme_async_tqueue_no_passthrough",
+        alpha=0.05,
+        passthrough_test=True,
+        label="Experiment1",
+    )
+    exp2_ttest(
+        results,
+        baseline_impl="duckdb_xnvme_async_tqueue_no_passthrough",
+        alpha=0.05,
+        passthrough_test=True,
+        show_p_values=True,
+        label="Experiment1-t-test",
+    )
+    exp2_ttest(
+        results,
+        baseline_impl="duckdb_xnvme_async_tqueue_no_passthrough",
+        alpha=0.05,
+        passthrough_test=True,
+        show_p_values=True,
+        show_error_bars=True,
+        label="Experiment1-t-test-error-bars",
+    )
     exp1_table(results)
 
     print("\nPresenting Experiment 2..")
-    exp2_plot("Read Latency", results)
+    # exp2_plot("Read Latency", results)
     exp2_table(results)
 
     print("Running Experiment 2 T-Test..")
-    exp2_ttest(results, alpha=0.05, show=True)
+    exp2_ttest(results, alpha=0.05, label="Experiment2")
+    exp2_ttest(results, alpha=0.05, show_p_values=True, label="Experiment2-t-test")
+    exp2_ttest(
+        results,
+        alpha=0.05,
+        show_p_values=True,
+        show_error_bars=True,
+        label="Experiment2-t-test-error-bars",
+    )
 
     print("Done!")
